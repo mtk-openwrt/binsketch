@@ -1,0 +1,3460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BinSketch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F7F7F5; --surface: #FFFFFF; --surface2: #F4F4F2;
+  --border: rgba(0,0,0,0.07); --border2: rgba(0,0,0,0.11);
+  --ink: #1A1A1A; --ink2: #5C5C5C; --ink3: #9A9A9A;
+  --accent: #5B6AF0; --accent-lt: #EEF0FE; --accent-dk: #3D4EC8;
+  --green: #18A66A; --green-lt: #E9FAF3;
+  --red: #E5484D; --red-lt: #FFF0F0;
+  --amber: #C07C10; --amber-lt: #FFF8ED;
+  --radius: 12px; --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.04);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Header */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+header .logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+header .logo-icon {
+  width: 32px;
+  height: 32px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+header .logo-icon svg { width: 18px; height: 18px; }
+
+header h1 {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--ink);
+}
+
+header .subtitle {
+  font-size: 13px;
+  color: var(--ink3);
+  margin-left: 4px;
+}
+
+header .version-badge {
+  margin-left: auto;
+  font-family: 'DM Sans', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  font-size: 12px;
+  color: var(--ink3);
+  background: var(--surface2);
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+}
+
+/* Container */
+.container {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+
+/* Error banner */
+#wasm-error {
+  display: none;
+  background: var(--red-lt);
+  color: var(--red);
+  border: 1px solid rgba(229,72,77,0.2);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  align-items: center;
+  gap: 10px;
+}
+
+#wasm-error.visible { display: flex; }
+#wasm-error svg { flex-shrink: 0; }
+
+/* Loading */
+#loading-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  gap: 16px;
+  color: var(--ink2);
+  font-size: 15px;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Cards */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.card-header h2 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--ink);
+}
+
+.card-header .card-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.card-header .card-icon svg { width: 16px; height: 16px; }
+.card-header .card-icon.blue { background: var(--accent-lt); color: var(--accent); }
+.card-header .card-icon.green { background: var(--green-lt); color: var(--green); }
+.card-header .card-icon.amber { background: var(--amber-lt); color: var(--amber); }
+.card-header .card-icon.red { background: var(--red-lt); color: var(--red); }
+
+/* Form Elements */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+
+.form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink3);
+}
+
+select, input[type="text"] {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+select {
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%239A9A9A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+  cursor: pointer;
+}
+
+select:focus, input[type="text"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(91,106,240,0.12);
+}
+
+/* Tab bar */
+.tab-bar {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.tab-bar button {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 20px;
+  border: none;
+  background: var(--surface);
+  color: var(--ink3);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  flex: 1;
+  text-align: center;
+}
+
+.tab-bar button.active {
+  background: var(--accent);
+  color: white;
+}
+
+.tab-bar button:not(.active):hover {
+  background: var(--surface2);
+}
+
+/* Layout options section */
+.layout-options {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.layout-options h3 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink3);
+  margin-bottom: 12px;
+}
+
+.options-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  align-items: center;
+}
+
+.option-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.option-item input[type="checkbox"],
+.option-item input[type="radio"] {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.option-item label {
+  cursor: pointer;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.radio-group {
+  display: flex;
+  gap: 4px;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.radio-group label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  background: var(--surface);
+  color: var(--ink3);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.radio-group input[type="radio"] {
+  display: none;
+}
+
+.radio-group input[type="radio"]:checked + span {
+  background: var(--accent);
+  color: white;
+}
+
+.radio-group .radio-label {
+  display: block;
+  padding: 6px 14px;
+  transition: background 0.15s, color 0.15s;
+  border-radius: 0;
+}
+
+.no-options-msg {
+  font-size: 13px;
+  color: var(--ink3);
+  font-style: italic;
+}
+
+/* Flash info grid */
+.flash-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.flash-info-grid.nand-expanded {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.info-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.info-chip .info-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink3);
+}
+
+.info-chip .info-value {
+  font-family: 'DM Sans', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* Search dropdown */
+.search-select-wrapper {
+  position: relative;
+}
+
+.search-select-wrapper input[type="text"] {
+  width: 100%;
+}
+
+.search-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  max-height: 240px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.search-dropdown.open { display: block; }
+
+.search-dropdown .dropdown-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+
+.search-dropdown .dropdown-item:last-child { border-bottom: none; }
+
+.search-dropdown .dropdown-item:hover,
+.search-dropdown .dropdown-item.highlighted {
+  background: var(--accent-lt);
+}
+
+.dropdown-item .model-name {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.dropdown-item .model-meta {
+  font-size: 12px;
+  color: var(--ink3);
+  margin-top: 1px;
+}
+
+.search-dropdown .no-results {
+  padding: 14px;
+  text-align: center;
+  color: var(--ink3);
+  font-size: 13px;
+}
+
+/* Table */
+.table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+thead th {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink3);
+  background: var(--surface2);
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border2);
+  white-space: nowrap;
+}
+
+tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: rgba(91,106,240,0.03); }
+
+td .mono {
+  font-family: 'DM Sans', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--ink2);
+}
+
+/* Numeric values use DM Sans with tabular-nums for clarity */
+.num {
+  font-family: 'DM Sans', sans-serif !important;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+td .badge {
+  display: inline-block;
+  font-family: 'DM Sans', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+td .badge-ff { background: #F0EFFD; color: #5B6AF0; }
+td .badge-00 { background: #E9FAF3; color: #18A66A; }
+td .badge-ubi { background: #FFF8ED; color: #C07C10; }
+
+/* ── UBI volume rows (nested under UBI partition) ─────────────── */
+tr.ubi-volume-row td {
+  background: rgba(91,106,240,0.025);
+  border-bottom: 1px solid var(--border);
+}
+tr.ubi-volume-row:hover td {
+  background: rgba(91,106,240,0.06);
+}
+
+/* First column of UBI volume rows: tree connector + name input */
+tr.ubi-volume-row td:first-child {
+  position: relative;
+  padding-left: 36px;
+}
+
+/* Vertical line spanning the row (top to bottom) */
+tr.ubi-volume-row td:first-child::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: var(--accent);
+  opacity: 0.45;
+}
+
+/* Horizontal branch (L shape) — meets the input vertically centered */
+tr.ubi-volume-row td:first-child::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  width: 14px;
+  height: 1.5px;
+  background: var(--accent);
+  opacity: 0.45;
+}
+
+/* Last UBI volume row: vertical line stops at the L corner (top half only) */
+tr.ubi-volume-row.ubi-vol-last td:first-child::before {
+  bottom: auto;
+  height: 50%;
+}
+
+/* Reserved rows: GPT header, NMBM management area — auto-generated at boot */
+tr.reserved-row td {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--surface2) 0 8px,
+    rgba(0,0,0,0.025) 8px 16px
+  );
+  color: var(--ink3);
+}
+tr.reserved-row td input.cell-edit[readonly] {
+  color: var(--ink3);
+  background: transparent;
+  cursor: default;
+}
+tr.reserved-row td input.cell-edit[readonly]:hover,
+tr.reserved-row td input.cell-edit[readonly]:focus {
+  border-color: transparent;
+  outline: none;
+}
+.reserved-cell .reserved-note {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--ink3);
+  padding: 0 6px;
+}
+
+/* Bounds-check: rows / banner shown when start+size exceeds flash capacity */
+.bounds-warning {
+  background: #fff4e5;
+  border-left: 3px solid #f59e0b;
+  color: #92400e;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  padding: 10px 14px;
+  margin: 0 0 10px 0;
+  border-radius: 6px;
+}
+tr.overflow-row > td {
+  background: linear-gradient(
+    90deg,
+    rgba(239, 68, 68, 0.08) 0%,
+    rgba(239, 68, 68, 0.02) 50%,
+    transparent 100%
+  );
+}
+tr.overflow-row > td:first-child {
+  border-left: 3px solid #ef4444;
+}
+
+/* Partition Table column sizing — stop the type dropdown in the
+ * Name cell from strangling the name input, and give numeric
+ * columns a sensible floor so they don't steal space either. */
+#partition-table {
+  table-layout: auto;
+  min-width: 820px;
+}
+#partition-table th:nth-child(1),
+#partition-table td:nth-child(1) { min-width: 220px; }
+#partition-table th:nth-child(2),
+#partition-table td:nth-child(2) { min-width: 110px; }
+#partition-table th:nth-child(3),
+#partition-table td:nth-child(3) { min-width: 110px; }
+#partition-table th:nth-child(6),
+#partition-table td:nth-child(6) { min-width: 200px; }
+
+/* Share-image toggle inside the image cell on normal containers */
+.share-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  color: var(--ink3);
+  cursor: pointer;
+  user-select: none;
+}
+.share-toggle input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+.share-toggle:hover {
+  color: var(--ink2);
+}
+
+/* Name cell hosts the name input and an inline type selector
+ * (normal / UBI). The input grows to fill the remaining space;
+ * the dropdown is pinned to ~70px on the right so the name
+ * always has a sensible minimum width. */
+.name-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.name-cell > input.cell-edit-name {
+  flex: 1 1 auto;
+  min-width: 80px;
+}
+.name-cell > select.type-select {
+  flex: 0 0 72px;
+  width: 72px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface1);
+  color: var(--ink2);
+  cursor: pointer;
+}
+.name-cell > select.type-select:hover {
+  border-color: var(--accent);
+}
+
+.cell-readonly {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--ink3);
+  font-style: italic;
+  padding: 4px 0;
+}
+
+/* Editable table inputs */
+td input.cell-edit {
+  font-family: 'DM Sans', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  font-size: 13px;
+  padding: 4px 8px;
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--ink);
+  width: 100%;
+  min-width: 60px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+td input.cell-edit:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(91,106,240,0.12);
+}
+
+td input.cell-edit-name {
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+/* Image select in table */
+td select.image-select {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--ink);
+  width: 100%;
+  min-width: 100px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+td select.image-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(91,106,240,0.12);
+}
+
+td.drag-over {
+  background: var(--accent-lt) !important;
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
+
+/* Buttons */
+.btn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+
+.btn:active { transform: scale(0.98); }
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+}
+
+.btn-primary:hover { background: var(--accent-dk); }
+.btn-primary:disabled {
+  background: var(--ink3);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-secondary {
+  background: var(--surface);
+  color: var(--ink2);
+  border: 1px solid var(--border2);
+}
+
+.btn-secondary:hover {
+  background: var(--surface2);
+  border-color: var(--border2);
+}
+
+.btn-sm {
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+.btn svg { width: 16px; height: 16px; }
+
+.btn-delete {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink3);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.btn-delete:hover {
+  background: var(--red-lt);
+  color: var(--red);
+  border-color: rgba(229,72,77,0.3);
+}
+
+.actions-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.add-partition-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+/* Image Pool */
+.pool-dropzone {
+  border: 2px dashed var(--border2);
+  border-radius: var(--radius-sm);
+  padding: 24px;
+  text-align: center;
+  color: var(--ink3);
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  margin-bottom: 16px;
+}
+
+.pool-dropzone:hover,
+.pool-dropzone.drag-active {
+  border-color: var(--accent);
+  background: var(--accent-lt);
+}
+
+.pool-dropzone .browse-btn {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.pool-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pool-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  cursor: grab;
+  transition: background 0.1s, box-shadow 0.1s;
+}
+
+.pool-item:hover {
+  background: var(--accent-lt);
+  box-shadow: var(--shadow);
+}
+
+.pool-item.dragging {
+  opacity: 0.5;
+}
+
+.pool-item .pool-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+  color: var(--ink3);
+}
+
+.pool-item .pool-name {
+  font-weight: 600;
+  color: var(--ink);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pool-item .pool-size {
+  font-family: 'DM Sans', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  font-size: 12px;
+  color: var(--ink3);
+  flex-shrink: 0;
+}
+
+.pool-item .pool-source {
+  font-size: 11px;
+  color: var(--ink3);
+  font-style: italic;
+  flex-shrink: 0;
+}
+
+.pool-item .pool-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-extract {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 5px;
+  border: 1px solid var(--green);
+  background: var(--green-lt);
+  color: var(--green);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-extract:hover {
+  background: var(--green);
+  color: white;
+}
+
+/* Layout Visualization */
+.layout-bar-container {
+  position: relative;
+  margin-top: 8px;
+}
+
+.layout-bar {
+  display: flex;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+}
+
+.layout-segment {
+  height: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: default;
+  transition: opacity 0.15s;
+  border-right: 1px solid rgba(255,255,255,0.6);
+}
+
+.layout-segment:last-child { border-right: none; }
+.layout-segment:hover { opacity: 0.85; }
+
+.layout-segment .seg-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 4px;
+}
+
+.layout-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 12px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink2);
+}
+
+.legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.legend-offset {
+  font-family: 'DM Sans', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  font-size: 11px;
+  color: var(--ink3);
+}
+
+.utilization-bar {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.utilization-track {
+  flex: 1;
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.utilization-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 0.3s;
+}
+
+.utilization-text {
+  font-family: 'DM Sans', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  font-size: 12px;
+  color: var(--ink2);
+  white-space: nowrap;
+}
+
+/* Flash info mode toggle */
+.flash-mode-toggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.flash-mode-toggle button {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 16px;
+  border: none;
+  background: var(--surface);
+  color: var(--ink3);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  flex: 1;
+  text-align: center;
+}
+
+.flash-mode-toggle button.active {
+  background: var(--accent);
+  color: white;
+}
+
+.flash-mode-toggle button:not(.active):hover {
+  background: var(--surface2);
+}
+
+.custom-flash-fields {
+  display: none;
+  margin-bottom: 16px;
+}
+
+.custom-flash-fields.visible {
+  display: block;
+}
+
+.custom-flash-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.custom-flash-grid.nand-custom {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.custom-flash-grid select, .custom-flash-grid input[type="text"] {
+  font-size: 13px;
+  padding: 8px 10px;
+}
+
+/* GPT buttons row */
+.gpt-buttons {
+  display: none;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.gpt-buttons.visible {
+  display: flex;
+}
+
+/* Modal / dump overlay */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(4px);
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-overlay.open { display: flex; }
+
+.modal-box {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  max-width: 700px;
+  width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h3 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.modal-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink3);
+  transition: background 0.1s;
+}
+
+.modal-close:hover { background: var(--surface2); }
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.modal-body pre {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre;
+  color: var(--ink2);
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 300;
+  background: var(--ink);
+  color: white;
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  transform: translateY(20px);
+  opacity: 0;
+  transition: transform 0.2s, opacity 0.2s;
+  pointer-events: none;
+  max-width: 420px;
+}
+
+.toast.visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.toast.error { background: var(--red); }
+.toast.success { background: var(--green); }
+
+/* Tooltip */
+[data-tooltip] { position: relative; }
+[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: white;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* Responsive */
+@media (max-width: 720px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .form-grid-2 { grid-template-columns: 1fr; }
+  .flash-info-grid, .flash-info-grid.nand-expanded { grid-template-columns: 1fr; }
+  .actions-row { flex-direction: column; }
+  .actions-row .btn { width: 100%; justify-content: center; }
+  header .subtitle { display: none; }
+  .container { padding: 16px 12px 40px; }
+  .options-row { flex-direction: column; gap: 8px; }
+  .tab-bar button { font-size: 12px; padding: 7px 12px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="2" width="20" height="20" rx="2"/><path d="M7 7h10M7 12h10M7 17h6"/>
+      </svg>
+    </div>
+    <div>
+      <h1>BinSketch</h1>
+    </div>
+  </div>
+  <span class="subtitle">MediaTek Filogic Firmware Image Packing Tool</span>
+  <span class="version-badge" id="version-badge">loading...</span>
+</header>
+
+<div class="container">
+  <!-- WASM error banner -->
+  <div id="wasm-error">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span id="wasm-error-msg">Failed to load WASM module. This tool requires WebAssembly support.</span>
+  </div>
+
+  <!-- Loading state -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <span>Loading WASM module...</span>
+  </div>
+
+  <!-- Main content (hidden until WASM loads) -->
+  <div id="main-content" style="display:none;">
+
+    <!-- 1. Configuration Card with Tabs -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        </div>
+        <h2>Configuration</h2>
+      </div>
+
+      <div class="tab-bar" id="config-tabs">
+        <button class="active" data-tab="quick">Quick Setup</button>
+        <button data-tab="custom">Customized</button>
+      </div>
+
+      <!-- Quick Setup Tab -->
+      <div id="tab-quick">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="sel-platform">Platform</label>
+            <select id="sel-platform"></select>
+          </div>
+          <div class="form-group">
+            <label for="sel-flash">Flash Type</label>
+            <select id="sel-flash"></select>
+          </div>
+          <div class="form-group">
+            <label for="sel-os-dist">OS Distribution</label>
+            <select id="sel-os-dist"></select>
+          </div>
+        </div>
+        <div class="layout-options" id="layout-options">
+          <h3>Layout Options</h3>
+          <div class="options-row" id="options-row"></div>
+        </div>
+      </div>
+
+      <!-- Customized Tab -->
+      <div id="tab-custom" style="display:none;">
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label for="sel-flash-custom">Flash Type</label>
+            <select id="sel-flash-custom"></select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Flash Info Card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon green">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01"/></svg>
+        </div>
+        <h2>Flash Information</h2>
+      </div>
+      <div class="flash-mode-toggle">
+        <button class="active" id="btn-flash-from-model">From Model</button>
+        <button id="btn-flash-custom">Customized</button>
+      </div>
+      <div id="flash-model-section">
+        <div class="form-group" style="margin-bottom:16px;">
+          <label for="flash-model-search">Flash Model</label>
+          <div class="search-select-wrapper">
+            <input type="text" id="flash-model-search" placeholder="Search flash model..." autocomplete="off">
+            <div class="search-dropdown" id="flash-model-dropdown"></div>
+          </div>
+        </div>
+      </div>
+      <div class="custom-flash-fields" id="custom-flash-fields">
+        <div class="custom-flash-grid" id="custom-flash-grid">
+          <div class="form-group">
+            <label for="custom-capacity">Capacity</label>
+            <select id="custom-capacity"></select>
+          </div>
+          <div class="form-group nand-custom-field" style="display:none;">
+            <label for="custom-page-size">Page Size</label>
+            <select id="custom-page-size">
+              <option value="2048">2 KiB</option>
+              <option value="4096">4 KiB</option>
+            </select>
+          </div>
+          <div class="form-group nand-custom-field" style="display:none;">
+            <label for="custom-block-size">Block Size</label>
+            <select id="custom-block-size">
+              <option value="131072">128 KiB</option>
+              <option value="262144">256 KiB</option>
+              <option value="524288">512 KiB</option>
+            </select>
+          </div>
+          <div class="form-group nand-custom-field" style="display:none;">
+            <label for="custom-oob-size">OOB Size</label>
+            <select id="custom-oob-size">
+              <option value="64">64 B</option>
+              <option value="128">128 B</option>
+              <option value="256">256 B</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="flash-info-grid" id="flash-info-grid">
+        <div class="info-chip">
+          <span class="info-label">Flash Size</span>
+          <span class="info-value" id="info-flash-size">--</span>
+        </div>
+        <div class="info-chip">
+          <span class="info-label">Vendor</span>
+          <span class="info-value" id="info-vendor">--</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Image Pool Card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon amber">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+        </div>
+        <h2>Image Pool</h2>
+      </div>
+      <div class="pool-dropzone" id="pool-dropzone">
+        <div>Drag files here or <span class="browse-btn" id="pool-browse">click to browse</span></div>
+        <input type="file" id="pool-file-input" multiple style="display:none;">
+      </div>
+      <div class="pool-list" id="pool-list"></div>
+    </div>
+
+    <!-- 4. Partition Table Card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon red">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="3"/></svg>
+        </div>
+        <h2>Partition Table</h2>
+      </div>
+      <div id="bounds-warning" class="bounds-warning" hidden></div>
+      <div class="table-wrapper">
+        <table id="partition-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Offset</th>
+              <th>Size (hex)</th>
+              <th>Size</th>
+              <th>Pad</th>
+              <th>Image</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="partition-tbody"></tbody>
+        </table>
+      </div>
+      <div class="add-partition-row">
+        <button class="btn btn-secondary btn-sm" id="btn-add-partition" title="Append a new partition at the next free offset">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Partition
+        </button>
+      </div>
+    </div>
+
+    <!-- 5. Actions Card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <h2>Actions</h2>
+      </div>
+      <div class="actions-row">
+        <button class="btn btn-primary" id="btn-pack">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Pack Image
+        </button>
+        <button class="btn btn-secondary" id="btn-download-yaml">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Download YAML
+        </button>
+        <button class="btn btn-secondary" id="btn-load-yaml">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Load YAML
+        </button>
+        <button class="btn btn-secondary" id="btn-dump-layout">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+          Dump Layout
+        </button>
+      </div>
+      <div class="gpt-buttons" id="gpt-buttons">
+        <button class="btn btn-secondary btn-sm" id="btn-download-primary-gpt">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download Primary GPT
+        </button>
+        <button class="btn btn-secondary btn-sm" id="btn-download-secondary-gpt">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download Secondary GPT
+        </button>
+      </div>
+    </div>
+
+    <!-- 6. Flash Layout Visualization -->
+    <div class="card" id="layout-viz-card" style="display:none;">
+      <div class="card-header">
+        <div class="card-icon green">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="3"/></svg>
+        </div>
+        <h2>Flash Layout Visualization</h2>
+      </div>
+      <div class="layout-bar-container">
+        <div class="layout-bar" id="layout-bar"></div>
+        <div class="layout-legend" id="layout-legend"></div>
+        <div class="utilization-bar" id="utilization-bar" style="display:none;">
+          <span class="utilization-text" id="util-label">Utilization</span>
+          <div class="utilization-track">
+            <div class="utilization-fill" id="util-fill" style="width:0%"></div>
+          </div>
+          <span class="utilization-text" id="util-pct">0%</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end main-content -->
+</div>
+
+<!-- Dump modal -->
+<div class="modal-overlay" id="dump-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Partition Layout Dump</h3>
+      <button class="modal-close" id="dump-modal-close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <pre id="dump-content"></pre>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden YAML file input -->
+<input type="file" id="yaml-file-input" accept=".yml,.yaml" style="display:none;">
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script type="module">
+(async function() {
+  // ============================================================
+  // State
+  // ============================================================
+  let wasm = null;
+  let currentTab = 'quick'; // 'quick' | 'custom'
+  let currentLayout = null;
+  let flashModels = [];
+  let selectedModel = null;
+  let flashInfoMode = 'model'; // 'model' | 'custom'
+
+  // Image pool: array of { id, name, data: Uint8Array, size, source? }
+  let imagePool = [];
+  let poolIdCounter = 0;
+
+  // Partition-to-image assignments: partitionIndex -> poolItemId
+  let partitionImageMap = {};
+
+  // Available options cache
+  let availableOptions = null;
+
+  const PARTITION_COLORS = [
+    '#5B6AF0', '#18A66A', '#C07C10', '#E5484D', '#9333EA',
+    '#0891B2', '#D946EF', '#EA580C', '#2563EB', '#65A30D',
+    '#DC2626', '#7C3AED', '#0D9488', '#CA8A04', '#DB2777'
+  ];
+
+  // ============================================================
+  // DOM refs
+  // ============================================================
+  const $ = id => document.getElementById(id);
+  const $loading = $('loading-overlay');
+  const $wasmError = $('wasm-error');
+  const $wasmErrorMsg = $('wasm-error-msg');
+  const $main = $('main-content');
+  const $version = $('version-badge');
+  const $platform = $('sel-platform');
+  const $flash = $('sel-flash');
+  const $osDist = $('sel-os-dist');
+  const $flashCustom = $('sel-flash-custom');
+  const $optionsRow = $('options-row');
+  const $layoutOptions = $('layout-options');
+  const $modelSearch = $('flash-model-search');
+  const $modelDropdown = $('flash-model-dropdown');
+  const $flashInfoGrid = $('flash-info-grid');
+  const $infoFlashSize = $('info-flash-size');
+  const $infoVendor = $('info-vendor');
+  const $tbody = $('partition-tbody');
+  const $layoutBar = $('layout-bar');
+  const $layoutLegend = $('layout-legend');
+  const $utilBar = $('utilization-bar');
+  const $utilFill = $('util-fill');
+  const $utilPct = $('util-pct');
+  const $toast = $('toast');
+  const $dumpModal = $('dump-modal');
+  const $dumpContent = $('dump-content');
+  const $gptButtons = $('gpt-buttons');
+  const $btnFlashFromModel = $('btn-flash-from-model');
+  const $btnFlashCustom = $('btn-flash-custom');
+  const $flashModelSection = $('flash-model-section');
+  const $customFlashFields = $('custom-flash-fields');
+  const $customCapacity = $('custom-capacity');
+  const $customFlashGrid = $('custom-flash-grid');
+  const $yamlFileInput = $('yaml-file-input');
+  const $poolList = $('pool-list');
+  const $poolDropzone = $('pool-dropzone');
+  const $poolFileInput = $('pool-file-input');
+
+  // ============================================================
+  // Toast
+  // ============================================================
+  let toastTimer = null;
+  function showToast(msg, type) {
+    clearTimeout(toastTimer);
+    $toast.textContent = msg;
+    $toast.className = 'toast ' + (type || '') + ' visible';
+    toastTimer = setTimeout(() => { $toast.classList.remove('visible'); }, 3500);
+  }
+
+  // ============================================================
+  // WASM Load
+  // ============================================================
+  try {
+    const base = new URL('.', import.meta.url).href;
+    wasm = await import(base + 'pkg/binsketch_wasm.js');
+    await wasm.default();
+  } catch (err) {
+    $loading.style.display = 'none';
+    $wasmError.classList.add('visible');
+    $wasmErrorMsg.textContent = 'Failed to load WASM module: ' + (err.message || err);
+    return;
+  }
+
+  $loading.style.display = 'none';
+  $main.style.display = 'block';
+
+  // ============================================================
+  // Utility helpers
+  // ============================================================
+  function escapeHtml(s) {
+    const el = document.createElement('span');
+    el.textContent = s;
+    return el.innerHTML;
+  }
+
+  function formatHex(n) {
+    if (n === null || n === undefined) return '--';
+    if (typeof n === 'string') {
+      if (n.startsWith('0x') || n.startsWith('0X')) return n;
+      return n;
+    }
+    return '0x' + n.toString(16).toUpperCase();
+  }
+
+  function formatSize(bytes) {
+    if (typeof bytes === 'string') {
+      const n = parseInt(bytes, 16) || parseInt(bytes, 10);
+      if (isNaN(n)) return bytes;
+      bytes = n;
+    }
+    if (bytes === 0) return '0 B';
+    const units = ['B', 'KiB', 'MiB', 'GiB'];
+    for (let i = units.length - 1; i >= 0; i--) {
+      const s = Math.pow(1024, i);
+      if (bytes >= s) {
+        const v = bytes / s;
+        return (v === Math.floor(v) ? v.toString() : v.toFixed(1)) + ' ' + units[i];
+      }
+    }
+    return bytes + ' B';
+  }
+
+  function parseHexOrDec(v) {
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string') {
+      v = v.trim();
+      if (v.startsWith('0x') || v.startsWith('0X')) return parseInt(v, 16);
+      return parseInt(v, 10);
+    }
+    return 0;
+  }
+
+  function isNandType(ft) {
+    return ft === 'spim-nand' || ft === 'snfi-nand';
+  }
+
+  function isEmmcSd(ft) {
+    return ft === 'emmc' || ft === 'sd';
+  }
+
+  function getDefaultPad(ft) {
+    return isEmmcSd(ft) ? '0x00' : '0xFF';
+  }
+
+  function getActiveFlashType() {
+    return currentTab === 'quick' ? $flash.value : $flashCustom.value;
+  }
+
+  function getFlashCapacity() {
+    if (flashInfoMode === 'custom') {
+      const val = parseInt($customCapacity.value, 10);
+      return isNaN(val) ? 0 : val;
+    }
+    if (selectedModel && typeof selectedModel.size === 'number') {
+      return selectedModel.size;
+    }
+    return 0;
+  }
+
+  function readFileAsUint8Array(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(new Uint8Array(r.result));
+      r.onerror = reject;
+      r.readAsArrayBuffer(file);
+    });
+  }
+
+  function downloadBlob(data, filename) {
+    const blob = new Blob([data], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ============================================================
+  // Populate version
+  // ============================================================
+  try {
+    $version.textContent = 'v' + wasm.version();
+  } catch { $version.textContent = ''; }
+
+  // ============================================================
+  // Populate platforms from WASM
+  // ============================================================
+  let platforms = [];
+  try {
+    platforms = JSON.parse(wasm.get_platforms());
+    platforms.forEach(p => {
+      const o = document.createElement('option');
+      o.value = p.value; o.textContent = p.label;
+      $platform.appendChild(o);
+    });
+  } catch (e) {
+    showToast('Failed to load platforms: ' + e.message, 'error');
+  }
+
+  // ============================================================
+  // Populate flash types from WASM (per platform)
+  // ============================================================
+  function refreshFlashTypes() {
+    const prevValue = $flash.value;
+    try {
+      const flashTypes = JSON.parse(wasm.get_supported_flash_types($platform.value));
+      $flash.innerHTML = '';
+      flashTypes.forEach(ft => {
+        const o = document.createElement('option');
+        o.value = ft.value; o.textContent = ft.label;
+        $flash.appendChild(o);
+      });
+      if (flashTypes.some(ft => ft.value === prevValue)) {
+        $flash.value = prevValue;
+      }
+      // Also populate the customized tab flash type dropdown with same values
+      $flashCustom.innerHTML = '';
+      flashTypes.forEach(ft => {
+        const o = document.createElement('option');
+        o.value = ft.value; o.textContent = ft.label;
+        $flashCustom.appendChild(o);
+      });
+    } catch (e) {
+      showToast('Failed to load flash types: ' + e.message, 'error');
+    }
+  }
+  refreshFlashTypes();
+
+  // ============================================================
+  // Populate OS distributions from WASM
+  // ============================================================
+  try {
+    const osDists = JSON.parse(wasm.get_os_distributions());
+    osDists.forEach(d => {
+      const o = document.createElement('option');
+      o.value = d.value; o.textContent = d.label;
+      $osDist.appendChild(o);
+    });
+  } catch (e) {
+    showToast('Failed to load OS distributions: ' + e.message, 'error');
+  }
+
+  // ============================================================
+  // Tab switching
+  // ============================================================
+  const $configTabs = $('config-tabs');
+  $configTabs.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-tab]');
+    if (!btn) return;
+    const tab = btn.dataset.tab;
+    if (tab === currentTab) return;
+    currentTab = tab;
+    $configTabs.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    $('tab-quick').style.display = tab === 'quick' ? '' : 'none';
+    $('tab-custom').style.display = tab === 'custom' ? '' : 'none';
+    rebuildLayout();
+  });
+
+  // ============================================================
+  // Layout options (dynamic checkboxes/radios)
+  // ============================================================
+  function refreshAvailableOptions() {
+    $optionsRow.innerHTML = '';
+    availableOptions = null;
+    try {
+      const raw = wasm.get_available_options($flash.value, $osDist.value);
+      availableOptions = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch (e) {
+      availableOptions = null;
+    }
+
+    if (!availableOptions) {
+      $optionsRow.innerHTML = '<span class="no-options-msg">No options available for this configuration.</span>';
+      return;
+    }
+
+    // Read the default options for the current flash type + OS dist so
+    // the radios/checkboxes reflect the correct defaults (e.g., Full-UBI
+    // for 25.12, NMBM+UBI for 21.02).
+    let defaults = {};
+    try {
+      const raw = wasm.get_default_options($flash.value, $osDist.value);
+      defaults = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch (e) {
+      defaults = {};
+    }
+
+    let hasAny = false;
+
+    // NAND mode radio
+    if (availableOptions.has_nand_mode) {
+      hasAny = true;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'option-item';
+      const defaultMode = defaults.nand_mode || 'nmbm-ubi';
+      const nmbmChecked = defaultMode === 'nmbm-ubi' ? ' checked' : '';
+      const fullChecked = defaultMode === 'full-ubi' ? ' checked' : '';
+      wrapper.innerHTML =
+        '<div class="radio-group">' +
+          '<label><input type="radio" name="nand_mode" value="nmbm-ubi"' + nmbmChecked + '><span class="radio-label">NMBM+UBI</span></label>' +
+          '<label><input type="radio" name="nand_mode" value="full-ubi"' + fullChecked + '><span class="radio-label">Full-UBI</span></label>' +
+        '</div>';
+      wrapper.querySelectorAll('input[type="radio"]').forEach(r => {
+        r.addEventListener('change', rebuildLayout);
+      });
+      $optionsRow.appendChild(wrapper);
+    }
+
+    // Dual kernel checkbox
+    if (availableOptions.has_dual_kernel) {
+      hasAny = true;
+      const lbl = availableOptions.dual_kernel_label || 'Dual Kernel';
+      const item = document.createElement('div');
+      item.className = 'option-item';
+      item.innerHTML = '<input type="checkbox" id="opt-dual-kernel"><label for="opt-dual-kernel">' + escapeHtml(lbl) + '</label>';
+      item.querySelector('input').addEventListener('change', rebuildLayout);
+      $optionsRow.appendChild(item);
+    }
+
+    // Dual rootfs checkbox
+    if (availableOptions.has_dual_rootfs) {
+      hasAny = true;
+      const item = document.createElement('div');
+      item.className = 'option-item';
+      item.innerHTML = '<input type="checkbox" id="opt-dual-rootfs"><label for="opt-dual-rootfs">Dual Rootfs</label>';
+      item.querySelector('input').addEventListener('change', rebuildLayout);
+      $optionsRow.appendChild(item);
+    }
+
+    // Dual FIP checkbox
+    if (availableOptions.has_dual_fip) {
+      hasAny = true;
+      const item = document.createElement('div');
+      item.className = 'option-item';
+      item.innerHTML = '<input type="checkbox" id="opt-dual-fip"><label for="opt-dual-fip">Dual FIP</label>';
+      item.querySelector('input').addEventListener('change', rebuildLayout);
+      $optionsRow.appendChild(item);
+    }
+
+    // Dual firmware checkbox
+    if (availableOptions.has_dual_firmware) {
+      hasAny = true;
+      const item = document.createElement('div');
+      item.className = 'option-item';
+      item.innerHTML = '<input type="checkbox" id="opt-dual-firmware"><label for="opt-dual-firmware">Dual Firmware</label>';
+      item.querySelector('input').addEventListener('change', rebuildLayout);
+      $optionsRow.appendChild(item);
+    }
+
+    if (!hasAny) {
+      $optionsRow.innerHTML = '<span class="no-options-msg">No layout options for this flash type.</span>';
+    }
+  }
+
+  function buildOptionsJson() {
+    const opts = {};
+    // Get defaults first
+    try {
+      const raw = wasm.get_default_options($flash.value, $osDist.value);
+      const defaults = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      Object.assign(opts, defaults);
+    } catch (e) {
+      // Use empty defaults
+    }
+
+    // Override with current UI state
+    if (availableOptions) {
+      if (availableOptions.has_nand_mode) {
+        const checked = document.querySelector('input[name="nand_mode"]:checked');
+        if (checked) opts.nand_mode = checked.value;
+      }
+      if (availableOptions.has_dual_kernel) {
+        const cb = $('opt-dual-kernel');
+        if (cb) opts.dual_kernel = cb.checked;
+      }
+      if (availableOptions.has_dual_rootfs) {
+        const cb = $('opt-dual-rootfs');
+        if (cb) opts.dual_rootfs = cb.checked;
+      }
+      if (availableOptions.has_dual_fip) {
+        const cb = $('opt-dual-fip');
+        if (cb) opts.dual_fip = cb.checked;
+      }
+      if (availableOptions.has_dual_firmware) {
+        const cb = $('opt-dual-firmware');
+        if (cb) opts.dual_firmware = cb.checked;
+      }
+    }
+    // Flash capacity lets the Rust core compute ubi partition size
+    // in Full-UBI mode (= flash_size - bl2_size).
+    const cap = getFlashCapacity();
+    if (cap > 0) {
+      opts.flash_size = cap;
+    }
+
+    // NAND page / block size — required for UBI packing. Prefer the selected
+    // flash model's values; fall back to the custom panel when in custom mode.
+    const ft = getActiveFlashType();
+    if (ft === 'spim-nand' || ft === 'snfi-nand') {
+      const pickNum = (...vals) => {
+        for (const v of vals) {
+          const n = typeof v === 'number' ? v : parseInt(v, 10);
+          if (!isNaN(n) && n > 0) return n;
+        }
+        return null;
+      };
+      if (flashInfoMode === 'model' && selectedModel) {
+        const page = pickNum(selectedModel.pageSize, selectedModel.page_size);
+        const block = pickNum(selectedModel.blockSize, selectedModel.block_size);
+        if (page) opts.nand_page_size = page;
+        if (block) opts.nand_block_size = block;
+      } else if (flashInfoMode === 'custom') {
+        const page = pickNum($('custom-page-size')?.value);
+        const block = pickNum($('custom-block-size')?.value);
+        if (page) opts.nand_page_size = page;
+        if (block) opts.nand_block_size = block;
+      }
+    }
+    return JSON.stringify(opts);
+  }
+
+  // ============================================================
+  // Rebuild layout (central function)
+  // ============================================================
+  function rebuildLayout() {
+    currentLayout = null;
+    partitionImageMap = {};
+
+    try {
+      if (currentTab === 'quick') {
+        const raw = wasm.build_layout_json($platform.value, $flash.value, buildOptionsJson());
+        currentLayout = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      } else {
+        const raw = wasm.empty_layout_json($flashCustom.value);
+        currentLayout = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      }
+    } catch (e) {
+      console.error('rebuildLayout failed:', e);
+      currentLayout = null;
+      showToast('Layout build failed: ' + e, 'error');
+    }
+
+    // Default `share_sub_image = true` on normal containers (raw
+    // sub-parts). The canonical case is Full-UBI BL2: 3 or 4 identical
+    // copies of the same bl2.img, so sharing is the expected default
+    // and avoids forcing the user to pick the same image N times.
+    if (currentLayout && Array.isArray(currentLayout.partitions)) {
+      currentLayout.partitions.forEach((p) => {
+        if (p.share_sub_image !== undefined) return;
+        const subs = Array.isArray(p.sub_partitions) ? p.sub_partitions : null;
+        if (!subs || subs.length === 0) return;
+        const hasUbiVol = subs.some((s) => s.kind === 'ubi-volume');
+        if (!hasUbiVol) p.share_sub_image = true;
+      });
+    }
+
+    renderPartitionTable();
+    renderLayoutVisualization();
+    updateGptButtons();
+  }
+
+  // ============================================================
+  // Flash models
+  // ============================================================
+  function loadFlashModels() {
+    const ft = getActiveFlashType();
+    flashModels = [];
+    selectedModel = null;
+    $modelSearch.value = '';
+    $infoFlashSize.textContent = '--';
+    $infoVendor.textContent = '--';
+    updateNandInfo(null);
+    try {
+      let raw;
+      if (ft === 'spim-nor') raw = wasm.get_nor_models();
+      else if (ft === 'spim-nand' || ft === 'snfi-nand') raw = wasm.get_nand_models();
+      else if (ft === 'emmc') raw = wasm.get_emmc_models();
+      else if (ft === 'sd') raw = wasm.get_sd_models();
+      if (typeof raw === 'string') flashModels = JSON.parse(raw);
+      else if (Array.isArray(raw)) flashModels = raw;
+      else flashModels = [];
+    } catch (e) {
+      flashModels = [];
+    }
+    closeModelDropdown();
+    // Intentionally NOT auto-selecting a model. The Flash Layout
+    // Visualization stays hidden until the user either picks a model
+    // from the dropdown or switches flashInfoMode to 'custom'.
+  }
+
+  function updateNandInfo(model) {
+    document.querySelectorAll('.nand-info-chip').forEach(el => el.remove());
+    const ft = getActiveFlashType();
+    if (isNandType(ft) && model) {
+      $flashInfoGrid.classList.add('nand-expanded');
+      const chips = [
+        { label: 'Page Size', value: model.pageSize || model.page_size || '--' },
+        { label: 'Block Size', value: model.blockSize || model.block_size || '--' },
+        { label: 'OOB Size', value: model.oobSize || model.oob_size || '--' }
+      ];
+      chips.forEach(c => {
+        const div = document.createElement('div');
+        div.className = 'info-chip nand-info-chip';
+        div.innerHTML = '<span class="info-label">' + c.label + '</span><span class="info-value">' +
+          (typeof c.value === 'number' ? formatSize(c.value) : c.value) + '</span>';
+        $flashInfoGrid.appendChild(div);
+      });
+    } else {
+      $flashInfoGrid.classList.remove('nand-expanded');
+    }
+  }
+
+  function selectModel(model) {
+    selectedModel = model;
+    $modelSearch.value = model.name;
+    $infoFlashSize.textContent = typeof model.size === 'number' ? formatSize(model.size) : (model.size || '--');
+    $infoVendor.textContent = model.vendor || '--';
+    updateNandInfo(model);
+    closeModelDropdown();
+    // Rebuild layout so ubi partition size picks up the new flash capacity
+    if (currentTab === 'quick') {
+      rebuildLayout();
+    } else {
+      renderLayoutVisualization();
+    }
+  }
+
+  function renderModelDropdown(query) {
+    const q = (query || '').toLowerCase().trim();
+    let filtered = flashModels;
+    if (q) {
+      filtered = flashModels.filter(m => {
+        const haystack = (m.name + ' ' + (m.vendor || '') + ' ' + (m.description || '')).toLowerCase();
+        return haystack.includes(q);
+      });
+    }
+    $modelDropdown.innerHTML = '';
+    if (filtered.length === 0) {
+      $modelDropdown.innerHTML = '<div class="no-results">No models found</div>';
+    } else {
+      filtered.slice(0, 50).forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'dropdown-item';
+        const sizeStr = typeof m.size === 'number' ? formatSize(m.size) : (m.size || '');
+        div.innerHTML = '<div class="model-name">' + escapeHtml(m.name) + '</div>' +
+          '<div class="model-meta">' + escapeHtml((m.vendor || '') + (sizeStr ? ' - ' + sizeStr : '')) + '</div>';
+        div.addEventListener('click', () => selectModel(m));
+        $modelDropdown.appendChild(div);
+      });
+    }
+    $modelDropdown.classList.add('open');
+  }
+
+  function closeModelDropdown() {
+    $modelDropdown.classList.remove('open');
+  }
+
+  $modelSearch.addEventListener('focus', () => renderModelDropdown($modelSearch.value));
+  $modelSearch.addEventListener('input', () => renderModelDropdown($modelSearch.value));
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-select-wrapper')) closeModelDropdown();
+  });
+
+  // ============================================================
+  // Flash info mode toggle (From Model / Customized)
+  // ============================================================
+  function setFlashInfoMode(mode) {
+    flashInfoMode = mode;
+    if (mode === 'model') {
+      $btnFlashFromModel.classList.add('active');
+      $btnFlashCustom.classList.remove('active');
+      $flashModelSection.style.display = '';
+      $customFlashFields.classList.remove('visible');
+      // Drop the synthetic "Custom" pseudo-model that custom mode
+      // stashes in selectedModel. Real model selections from the
+      // dropdown keep their state.
+      if (selectedModel && selectedModel.name === 'Custom') {
+        selectedModel = null;
+        $infoFlashSize.textContent = '--';
+        $infoVendor.textContent = '--';
+      }
+    } else {
+      $btnFlashFromModel.classList.remove('active');
+      $btnFlashCustom.classList.add('active');
+      $flashModelSection.style.display = 'none';
+      $customFlashFields.classList.add('visible');
+      updateCustomCapacityOptions();
+      updateCustomFlashInfo();
+    }
+    // Refresh visualization: switching into custom (with a real capacity)
+    // should show the bar; switching back into model mode without a
+    // selection should hide it.
+    renderLayoutVisualization();
+  }
+
+  function updateCustomCapacityOptions() {
+    const ft = getActiveFlashType();
+    $customCapacity.innerHTML = '';
+    let sizes = [];
+    if (ft === 'spim-nor') {
+      sizes = [
+        { label: '4 MiB',  value: 4 * 1024 * 1024 },
+        { label: '8 MiB',  value: 8 * 1024 * 1024 },
+        { label: '16 MiB', value: 16 * 1024 * 1024 },
+        { label: '32 MiB', value: 32 * 1024 * 1024 },
+        { label: '64 MiB', value: 64 * 1024 * 1024 },
+      ];
+    } else if (isNandType(ft)) {
+      sizes = [
+        { label: '128 MiB', value: 128 * 1024 * 1024 },
+        { label: '256 MiB', value: 256 * 1024 * 1024 },
+        { label: '512 MiB', value: 512 * 1024 * 1024 },
+        { label: '1 GiB',   value: 1024 * 1024 * 1024 },
+        { label: '2 GiB',   value: 2 * 1024 * 1024 * 1024 },
+      ];
+    } else {
+      sizes = [
+        { label: '4 GiB',  value: 4 * 1024 * 1024 * 1024 },
+        { label: '8 GiB',  value: 8 * 1024 * 1024 * 1024 },
+        { label: '16 GiB', value: 16 * 1024 * 1024 * 1024 },
+        { label: '32 GiB', value: 32 * 1024 * 1024 * 1024 },
+        { label: '64 GiB', value: 64 * 1024 * 1024 * 1024 },
+      ];
+    }
+    sizes.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.value;
+      o.textContent = s.label;
+      $customCapacity.appendChild(o);
+    });
+    const nandFields = document.querySelectorAll('.nand-custom-field');
+    const showNand = isNandType(ft);
+    nandFields.forEach(f => f.style.display = showNand ? '' : 'none');
+    $customFlashGrid.classList.toggle('nand-custom', showNand);
+  }
+
+  function updateCustomFlashInfo() {
+    const capacity = parseInt($customCapacity.value, 10);
+    $infoFlashSize.textContent = isNaN(capacity) ? '--' : formatSize(capacity);
+    $infoVendor.textContent = 'Custom';
+    const ft = getActiveFlashType();
+    if (isNandType(ft)) {
+      const pageSize = parseInt($('custom-page-size').value, 10);
+      const blockSize = parseInt($('custom-block-size').value, 10);
+      const oobSize = parseInt($('custom-oob-size').value, 10);
+      selectedModel = { name: 'Custom', vendor: 'Custom', size: capacity, page_size: pageSize, block_size: blockSize, oob_size: oobSize };
+      updateNandInfo(selectedModel);
+    } else {
+      selectedModel = { name: 'Custom', vendor: 'Custom', size: capacity };
+      updateNandInfo(null);
+    }
+    // Rebuild layout so ubi partition size picks up the new flash capacity
+    if (currentTab === 'quick') {
+      rebuildLayout();
+    } else {
+      renderLayoutVisualization();
+    }
+  }
+
+  $btnFlashFromModel.addEventListener('click', () => setFlashInfoMode('model'));
+  $btnFlashCustom.addEventListener('click', () => setFlashInfoMode('custom'));
+  $customCapacity.addEventListener('change', updateCustomFlashInfo);
+  $('custom-page-size').addEventListener('change', updateCustomFlashInfo);
+  $('custom-block-size').addEventListener('change', updateCustomFlashInfo);
+  $('custom-oob-size').addEventListener('change', updateCustomFlashInfo);
+
+  // ============================================================
+  // Image Pool
+  // ============================================================
+  function addToPool(name, data, source) {
+    const id = ++poolIdCounter;
+    imagePool.push({ id, name, data, size: data.byteLength, source: source || null });
+    renderPoolList();
+    renderPartitionTable(); // refresh image dropdowns
+    return id;
+  }
+
+  function removeFromPool(id) {
+    imagePool = imagePool.filter(item => item.id !== id);
+    // Clear any partition assignments pointing to this id
+    for (const key in partitionImageMap) {
+      if (partitionImageMap[key] === id) delete partitionImageMap[key];
+    }
+    renderPoolList();
+    renderPartitionTable();
+  }
+
+  function isSysupgradeFile(name) {
+    return name.toLowerCase().includes('sysupgrade') && name.toLowerCase().endsWith('.bin');
+  }
+
+  // TAR extraction in JS (512-byte blocks)
+  function extractSysupgrade(data) {
+    const results = [];
+    let offset = 0;
+    const decoder = new TextDecoder('ascii');
+
+    while (offset + 512 <= data.length) {
+      const header = data.subarray(offset, offset + 512);
+      // Check for end-of-archive (two zero blocks)
+      let allZero = true;
+      for (let i = 0; i < 512; i++) {
+        if (header[i] !== 0) { allZero = false; break; }
+      }
+      if (allZero) break;
+
+      // Parse name (bytes 0-99)
+      let name = decoder.decode(header.subarray(0, 100)).replace(/\0.*$/, '');
+
+      // Parse size (bytes 124-135, octal)
+      const sizeStr = decoder.decode(header.subarray(124, 136)).replace(/\0.*$/, '').trim();
+      const fileSize = parseInt(sizeStr, 8);
+
+      if (isNaN(fileSize) || fileSize < 0 || fileSize > 1024 * 1024 * 1024) {
+        break; // invalid or too large
+      }
+
+      offset += 512; // skip header
+
+      if (fileSize > 0 && offset + fileSize <= data.length) {
+        const baseName = name.split('/').pop();
+        // Look for entries ending in "kernel" or "root"
+        if (baseName && (baseName.endsWith('kernel') || baseName === 'kernel' ||
+            baseName.endsWith('root') || baseName === 'root' ||
+            baseName === 'rootfs' || baseName.endsWith('rootfs'))) {
+          const entryData = new Uint8Array(data.buffer, data.byteOffset + offset, fileSize);
+          results.push({ name: baseName, data: new Uint8Array(entryData) });
+        }
+      }
+
+      // Advance past file data (rounded up to 512-byte boundary)
+      const blocks = Math.ceil(fileSize / 512);
+      offset += blocks * 512;
+    }
+
+    return results;
+  }
+
+  function renderPoolList() {
+    $poolList.innerHTML = '';
+    if (imagePool.length === 0) return;
+
+    imagePool.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'pool-item';
+      div.draggable = true;
+      div.dataset.poolId = item.id;
+
+      let sourceTag = '';
+      if (item.source) {
+        sourceTag = '<span class="pool-source">(from ' + escapeHtml(item.source) + ')</span>';
+      }
+
+      let actions = '';
+      if (isSysupgradeFile(item.name)) {
+        actions += '<button class="btn-extract" data-extract="' + item.id + '">Extract</button>';
+      }
+      actions += '<button class="btn-delete" data-pool-remove="' + item.id + '" title="Remove">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>';
+
+      div.innerHTML =
+        '<span class="pool-icon">\u{1F4C4}</span>' +
+        '<span class="pool-name">' + escapeHtml(item.name) + '</span>' +
+        sourceTag +
+        '<span class="pool-size">' + formatSize(item.size) + '</span>' +
+        '<div class="pool-actions">' + actions + '</div>';
+
+      // Drag start
+      div.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', String(item.id));
+        div.classList.add('dragging');
+      });
+      div.addEventListener('dragend', () => {
+        div.classList.remove('dragging');
+      });
+
+      // Extract button
+      const extractBtn = div.querySelector('[data-extract]');
+      if (extractBtn) {
+        extractBtn.addEventListener('click', () => {
+          try {
+            const entries = extractSysupgrade(item.data);
+            if (entries.length === 0) {
+              showToast('No kernel/rootfs entries found in sysupgrade.', 'error');
+              return;
+            }
+            entries.forEach(entry => {
+              addToPool(entry.name, entry.data, item.name);
+            });
+            showToast('Extracted ' + entries.length + ' entries from sysupgrade.', 'success');
+          } catch (e) {
+            showToast('Extraction failed: ' + (e.message || e), 'error');
+          }
+        });
+      }
+
+      // Remove button
+      const removeBtn = div.querySelector('[data-pool-remove]');
+      removeBtn.addEventListener('click', () => {
+        removeFromPool(item.id);
+      });
+
+      $poolList.appendChild(div);
+    });
+  }
+
+  // Pool dropzone
+  $poolDropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    $poolDropzone.classList.add('drag-active');
+  });
+  $poolDropzone.addEventListener('dragleave', () => {
+    $poolDropzone.classList.remove('drag-active');
+  });
+  $poolDropzone.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    $poolDropzone.classList.remove('drag-active');
+    const files = e.dataTransfer.files;
+    for (const file of files) {
+      const data = await readFileAsUint8Array(file);
+      addToPool(file.name, data);
+    }
+  });
+
+  $('pool-browse').addEventListener('click', () => $poolFileInput.click());
+  $poolDropzone.addEventListener('click', (e) => {
+    if (e.target === $poolDropzone || e.target.parentElement === $poolDropzone) {
+      $poolFileInput.click();
+    }
+  });
+
+  $poolFileInput.addEventListener('change', async (e) => {
+    for (const file of e.target.files) {
+      const data = await readFileAsUint8Array(file);
+      addToPool(file.name, data);
+    }
+    $poolFileInput.value = '';
+  });
+
+  // ============================================================
+  // Partition Table — layout validation
+  // ============================================================
+  /**
+   * Full layout validator. Returns:
+   *   {
+   *     overflow:     Set<idx>,                   // partition start+size > flash capacity
+   *     overlap:      Set<idx>,                   // partition overlaps its neighbour
+   *     subOverflow:  Set<"idx:subIdx">,          // sub-partition spills past parent
+   *     subOverSum:   Set<idx>,                   // sum of sub sizes > parent size
+   *     messages:     string[],                   // summary lines for the banner
+   *   }
+   * All offsets are taken from the layout's string form and parsed with
+   * parseHexOrDec. Sub-partition offsets are treated as parent-relative
+   * (matches the builder output for BL2 copies and UBI volumes).
+   */
+  function validateLayout() {
+    const result = {
+      overflow: new Set(),
+      overlap: new Set(),
+      subOverflow: new Set(),
+      subOverSum: new Set(),
+      messages: [],
+    };
+    if (!currentLayout || !Array.isArray(currentLayout.partitions)) return result;
+    const parts = currentLayout.partitions;
+    const cap = getFlashCapacity();
+
+    // Top-level: overflow against flash capacity + overlap with neighbours
+    const intervals = parts
+      .map((p, idx) => {
+        const start = parseHexOrDec(p.start);
+        const size = parseHexOrDec(p.size);
+        return { idx, start, size, end: start + size };
+      })
+      .filter((i) => !isNaN(i.start) && !isNaN(i.size));
+
+    if (cap > 0) {
+      for (const i of intervals) {
+        if (i.end > cap) result.overflow.add(i.idx);
+      }
+    }
+
+    // Overlap detection: sort by start, check neighbour gap
+    const sorted = [...intervals].sort((a, b) => a.start - b.start);
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const a = sorted[i], b = sorted[i + 1];
+      if (a.end > b.start) {
+        result.overlap.add(a.idx);
+        result.overlap.add(b.idx);
+      }
+    }
+
+    // Sub-partition: each sub's end must fit parent.size; sum of non-reserved
+    // raw sub parts must fit parent.size too.
+    parts.forEach((p, idx) => {
+      const subs = Array.isArray(p.sub_partitions) ? p.sub_partitions : [];
+      if (subs.length === 0) return;
+      const parentSize = parseHexOrDec(p.size);
+      if (isNaN(parentSize) || parentSize <= 0) return;
+      let used = 0;
+      subs.forEach((sub, subIdx) => {
+        const sStart = parseHexOrDec(sub.start);
+        const sSize = parseHexOrDec(sub.size);
+        if (isNaN(sSize)) return;
+        used += sSize;
+        // UBI volumes have no start (builder positions them); only check
+        // raw sub-partitions for out-of-parent overflow.
+        if (sub.kind !== 'ubi-volume' && !isNaN(sStart)) {
+          if (sStart + sSize > parentSize) {
+            result.subOverflow.add(idx + ':' + subIdx);
+          }
+        }
+      });
+      if (used > parentSize) result.subOverSum.add(idx);
+    });
+
+    // Build human-readable summary
+    if (result.overflow.size > 0) {
+      result.messages.push(
+        result.overflow.size + ' partition' + (result.overflow.size === 1 ? '' : 's') +
+        ' exceed flash capacity (' + formatSize(cap) + ')'
+      );
+    }
+    if (result.overlap.size > 0) {
+      result.messages.push(
+        result.overlap.size + ' partition' + (result.overlap.size === 1 ? '' : 's') +
+        ' overlap their neighbours'
+      );
+    }
+    if (result.subOverflow.size > 0) {
+      result.messages.push(
+        result.subOverflow.size + ' sub-partition' + (result.subOverflow.size === 1 ? '' : 's') +
+        ' extend past their parent'
+      );
+    }
+    if (result.subOverSum.size > 0) {
+      result.messages.push(
+        result.subOverSum.size + ' container' + (result.subOverSum.size === 1 ? '' : 's') +
+        ' have sub-parts totalling more than the container size'
+      );
+    }
+    return result;
+  }
+
+  function updateBoundsWarning(validation) {
+    const banner = $('bounds-warning');
+    if (!banner) return;
+    if (!validation || validation.messages.length === 0) {
+      banner.hidden = true;
+      banner.textContent = '';
+      return;
+    }
+    banner.hidden = false;
+    banner.textContent = '⚠ ' + validation.messages.join(' · ') + '.';
+  }
+
+  /**
+   * When the NMBM management area is edited, auto-resize the UBI partition
+   * above it so ubi.end == nmbm.start. Called from the cell-edit handler
+   * in buildPartitionRow after the nmbm mutation has been written back to
+   * currentLayout. If there's no `ubi` partition (or its offsets don't
+   * parse), does nothing.
+   */
+  function autoResizeUbiForNmbm(nmbm) {
+    if (!currentLayout || !Array.isArray(currentLayout.partitions)) return;
+    const ubi = currentLayout.partitions.find((p) => p.name === 'ubi');
+    if (!ubi) return;
+    const ubiStart = parseHexOrDec(ubi.start);
+    const nmbmStart = parseHexOrDec(nmbm.start);
+    if (isNaN(ubiStart) || isNaN(nmbmStart)) return;
+    if (nmbmStart <= ubiStart) return;
+    ubi.size = '0x' + (nmbmStart - ubiStart).toString(16).toUpperCase();
+  }
+
+  function renderPartitionTable() {
+    if (!currentLayout || !currentLayout.partitions) {
+      $tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--ink3);padding:20px;">No partitions.</td></tr>';
+      updateBoundsWarning(null);
+      return;
+    }
+    const parts = currentLayout.partitions;
+    const padByte = currentLayout.pad_byte || getDefaultPad(getActiveFlashType());
+    $tbody.innerHTML = '';
+
+    const validation = validateLayout();
+    parts.forEach((p, idx) => {
+      const tr = buildPartitionRow(p, idx, padByte, false);
+      const issues = [];
+      if (validation.overflow.has(idx)) issues.push('exceeds flash capacity');
+      if (validation.overlap.has(idx)) issues.push('overlaps another partition');
+      if (validation.subOverSum.has(idx)) issues.push('sub-parts total exceeds container size');
+      if (issues.length > 0) {
+        tr.classList.add('overflow-row');
+        tr.title = issues.join('; ');
+      }
+      $tbody.appendChild(tr);
+
+      // Render any nested sub_partitions (UBI volumes or BL2 copies)
+      const subs = Array.isArray(p.sub_partitions) ? p.sub_partitions : [];
+      subs.forEach((sub, subIdx) => {
+        const isLast = subIdx === subs.length - 1;
+        const subTr = buildSubPartitionRow(sub, idx, subIdx, isLast, padByte);
+        if (validation.subOverflow.has(idx + ':' + subIdx)) {
+          subTr.classList.add('overflow-row');
+          subTr.title = 'Sub-partition extends past parent boundary';
+        }
+        $tbody.appendChild(subTr);
+      });
+    });
+    updateBoundsWarning(validation);
+  }
+
+  // Build a regular partition row
+  function buildPartitionRow(p, idx, padByte, _isUbiVol) {
+    const tr = document.createElement('tr');
+    const startVal = p.start !== undefined && p.start !== null ? formatHex(p.start) : '0x0';
+    const sizeVal = p.size !== undefined && p.size !== null ? formatHex(p.size) : '0x0';
+    const human = p.size !== undefined && p.size !== null ? formatSize(parseHexOrDec(p.size)) : '--';
+    const pad = p.pad || padByte;
+    const badgeClass = pad === '0x00' ? 'badge-00' : 'badge-ff';
+    // Reserved partitions fall into three lock tiers:
+    //   gpt   — fully locked (auto-generated at pack time from the
+    //           partition table; no offset/size knob).
+    //   nmbm  — start + size are user-tunable (NMBM management area
+    //           can be shrunk to reclaim space for UBI), but the
+    //           image cell is still N/A.
+    //   other — same as nmbm by default: no image, editable offset/size.
+    const isReserved = p.reserved === true;
+    const isSizeLocked = isReserved && p.name === 'gpt';
+    const isStartLocked = isReserved && p.name === 'gpt';
+    if (isReserved) tr.classList.add('reserved-row');
+    const reservedTitle = isReserved
+      ? (p.name === 'gpt'
+          ? ' title="Auto-generated at pack time from the partition table"'
+          : ' title="Reserved hardware region — no image"')
+      : '';
+
+    // Type: inferred from children unless explicitly set. Determines
+    // what "+ Sub-part" / "+ Volume" means on this row and whether the
+    // image dropdown is suppressed.
+    const pType = partitionType(p);
+    const isUbiContainer = pType === 'ubi';
+    const hasSubParts = Array.isArray(p.sub_partitions) && p.sub_partitions.length > 0;
+    // A partition hides its image dropdown when it's a UBI container OR
+    // has raw sub-parts (images live on the children).
+    const isContainer = isUbiContainer || hasSubParts;
+
+    // "Share image across sub-parts" is a per-container toggle available
+    // only on normal containers (raw sub-parts). UBI volumes each carry
+    // their own distinct payload, so the option is meaningless there.
+    const canShareImage = isContainer && !isUbiContainer;
+    const shareImage = canShareImage && p.share_sub_image === true;
+
+    let imgCell;
+    if (isReserved) {
+      // GPT is genuinely auto-generated from the partition table at pack
+      // time (or by the bootloader). NMBM and raw padding regions are
+      // "not applicable" — no image concept at all.
+      const reservedLabel = p.name === 'gpt' ? 'auto-generated' : 'N/A';
+      imgCell = '<td class="image-cell reserved-cell"><span class="reserved-note">' + reservedLabel + '</span></td>';
+    } else if (isContainer && !shareImage) {
+      // Parent container note + optional share toggle (normal containers)
+      const toggle = canShareImage
+        ? '<label class="share-toggle" title="Pick one image and apply it to every sub-partition">' +
+          '<input type="checkbox" data-share-idx="' + idx + '"> share</label>'
+        : '';
+      imgCell =
+        '<td class="image-cell reserved-cell">' +
+        '<span class="reserved-note">container — assign on volumes below</span>' +
+        toggle +
+        '</td>';
+    } else if (isContainer && shareImage) {
+      // Unified image dropdown on the parent — the selection fans out
+      // to every non-reserved raw sub-part in the pack handler.
+      let imgOptions = '<option value="">-- none --</option>';
+      imagePool.forEach(item => {
+        const sel = (partitionImageMap['p' + idx] === item.id) ? ' selected' : '';
+        imgOptions += '<option value="' + item.id + '"' + sel + '>' + escapeHtml(item.name) + ' (' + formatSize(item.size) + ')</option>';
+      });
+      imgCell =
+        '<td class="image-cell" data-idx="' + idx + '">' +
+        '<select class="image-select" data-idx="' + idx + '">' + imgOptions + '</select>' +
+        '<label class="share-toggle" title="Pick one image and apply it to every sub-partition">' +
+        '<input type="checkbox" data-share-idx="' + idx + '" checked> share</label>' +
+        '</td>';
+    } else {
+      let imgOptions = '<option value="">-- none --</option>';
+      imagePool.forEach(item => {
+        const sel = (partitionImageMap['p' + idx] === item.id) ? ' selected' : '';
+        imgOptions += '<option value="' + item.id + '"' + sel + '>' + escapeHtml(item.name) + ' (' + formatSize(item.size) + ')</option>';
+      });
+      imgCell = '<td class="image-cell" data-idx="' + idx + '"><select class="image-select" data-idx="' + idx + '">' + imgOptions + '</select></td>';
+    }
+
+    // Non-reserved rows get an "+ Sub-part" / "+ Volume" button (label
+    // based on the partition type) in addition to the delete button.
+    // Reserved rows have neither.
+    let deleteCell;
+    if (isReserved) {
+      deleteCell = '<td></td>';
+    } else {
+      const addLabel = isUbiContainer ? '+ Volume' : '+ Sub-part';
+      deleteCell =
+        '<td style="display:flex;gap:4px">' +
+        '<button class="btn btn-secondary btn-sm" data-add-sub="' + idx + '" title="Add a nested sub-partition or UBI volume">' +
+        escapeHtml(addLabel) + '</button>' +
+        '<button class="btn-delete" data-delete="' + idx + '" title="Remove partition">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+        '</button></td>';
+    }
+
+    const nameAttr = isReserved ? ' readonly' : '';
+    const startAttr = isStartLocked ? ' readonly' : '';
+    const sizeAttr = isSizeLocked ? ' readonly' : '';
+
+    // Type selector — only shown on non-reserved rows. Lets the user
+    // flip a row between a normal (raw sub-parts allowed) partition and
+    // a UBI container (ubi-volume children).
+    const typeSelect = isReserved
+      ? ''
+      : '<select class="type-select" data-type-idx="' + idx + '" title="Partition type">' +
+        '<option value="normal"' + (pType === 'normal' ? ' selected' : '') + '>normal</option>' +
+        '<option value="ubi"' + (pType === 'ubi' ? ' selected' : '') + '>UBI</option>' +
+        '</select>';
+
+    tr.innerHTML =
+      '<td' + reservedTitle + '>' +
+      '<div class="name-cell">' +
+      '<input class="cell-edit cell-edit-name" type="text" value="' + escapeHtml(p.name) + '"' + nameAttr + ' data-field="name" data-idx="' + idx + '">' +
+      typeSelect +
+      '</div></td>' +
+      '<td><input class="cell-edit num" type="text" value="' + escapeHtml(String(startVal)) + '"' + startAttr + ' data-field="start" data-idx="' + idx + '"></td>' +
+      '<td><input class="cell-edit num" type="text" value="' + escapeHtml(String(sizeVal)) + '"' + sizeAttr + ' data-field="size" data-idx="' + idx + '"></td>' +
+      '<td><span class="size-human num">' + escapeHtml(String(human)) + '</span></td>' +
+      '<td><span class="badge ' + badgeClass + '">' + escapeHtml(String(pad)) + '</span></td>' +
+      imgCell +
+      deleteCell;
+
+    // Wire the type selector change
+    const typeSel = tr.querySelector('select.type-select');
+    if (typeSel) {
+      typeSel.addEventListener('change', () => {
+        window.__setPartitionType(idx, typeSel.value);
+      });
+    }
+
+    // Editable field handlers
+    const parts = currentLayout.partitions;
+    tr.querySelectorAll('input.cell-edit').forEach(input => {
+      input.addEventListener('change', () => {
+        const field = input.dataset.field;
+        const i = parseInt(input.dataset.idx, 10);
+        if (field === 'name') {
+          parts[i].name = input.value;
+        } else if (field === 'start') {
+          parts[i].start = input.value;
+        } else if (field === 'size') {
+          parts[i].size = input.value;
+          const humanSpan = tr.querySelector('.size-human');
+          if (humanSpan) humanSpan.textContent = formatSize(parseHexOrDec(input.value));
+        }
+
+        // NMBM edit → auto-resize UBI so ubi.end == nmbm.start. The
+        // NMBM region is a reserved block at the tail of the flash;
+        // when the user shrinks it the UBI partition above should
+        // reclaim the freed bytes (and vice versa).
+        if (parts[i].name === 'nmbm') {
+          autoResizeUbiForNmbm(parts[i]);
+        }
+
+        // Full re-render so the bounds-check / banner catch the edit.
+        renderPartitionTable();
+        renderLayoutVisualization();
+      });
+    });
+
+    // Share-image checkbox handler on normal containers.
+    if (canShareImage) {
+      const shareCheckbox = tr.querySelector('input[data-share-idx]');
+      if (shareCheckbox) {
+        shareCheckbox.addEventListener('change', () => {
+          p.share_sub_image = shareCheckbox.checked;
+          // When turning share OFF, drop the fan-out map entry on the
+          // parent so leftover state doesn't leak into the next pack.
+          if (!shareCheckbox.checked) {
+            delete partitionImageMap['p' + idx];
+          }
+          renderPartitionTable();
+          renderLayoutVisualization();
+        });
+      }
+    }
+
+    // Reserved rows have no image dropdown. Container rows are split
+    // into two modes:
+    //   - share off: container note, no dropdown on the parent
+    //   - share on:  unified dropdown whose selection fans out to
+    //                every non-reserved raw sub-part
+    // Leaf rows: dropdown with per-partition key ('p<idx>').
+    const wireImageDropdown =
+      !isReserved && (!isContainer || shareImage);
+    if (wireImageDropdown) {
+      // Image select handler
+      const imgSelect = tr.querySelector('select.image-select');
+      imgSelect.addEventListener('change', () => {
+        const val = imgSelect.value;
+        if (val) {
+          partitionImageMap['p' + idx] = parseInt(val, 10);
+        } else {
+          delete partitionImageMap['p' + idx];
+        }
+      });
+
+      // Drag-drop on image cell
+      const imgCell = tr.querySelector('.image-cell');
+      imgCell.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        imgCell.classList.add('drag-over');
+      });
+      imgCell.addEventListener('dragleave', () => {
+        imgCell.classList.remove('drag-over');
+      });
+      imgCell.addEventListener('drop', (e) => {
+        e.preventDefault();
+        imgCell.classList.remove('drag-over');
+        const poolId = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        if (!isNaN(poolId) && imagePool.some(item => item.id === poolId)) {
+          partitionImageMap['p' + idx] = poolId;
+          imgSelect.value = String(poolId);
+        }
+      });
+    }
+
+    // + Sub-part / + Volume button (present on every non-reserved row
+    // per Chunk G — lazily turns a leaf into a container).
+    if (!isReserved) {
+      const addBtn = tr.querySelector('[data-add-sub]');
+      if (addBtn) {
+        addBtn.addEventListener('click', () => {
+          window.__addSubPart(idx);
+        });
+      }
+    }
+
+    // Container rows still get a delete button; reserved rows don't.
+    if (!isReserved) {
+      const deleteBtn = tr.querySelector('[data-delete]');
+      if (deleteBtn) {
+        deleteBtn.addEventListener('click', () => {
+          parts.splice(idx, 1);
+          renderPartitionTable();
+          renderLayoutVisualization();
+        });
+      }
+    }
+
+    return tr;
+  }
+
+  // Build a generic sub-partition row (UBI volume OR raw sub-part like a
+  // BL2 copy). The row is nested visually under its parent with the tree
+  // connector CSS from `.ubi-volume-row`.
+  function buildSubPartitionRow(sub, parentIdx, subIdx, isLast, _padByte) {
+    const tr = document.createElement('tr');
+    tr.className = isLast ? 'ubi-volume-row ubi-vol-last' : 'ubi-volume-row';
+
+    const startVal = sub.start !== undefined && sub.start !== null ? formatHex(sub.start) : '0x0';
+    const sizeVal = sub.size !== undefined && sub.size !== null ? formatHex(sub.size) : '0x0';
+    const human = sub.size !== undefined && sub.size !== null ? formatSize(parseHexOrDec(sub.size)) : '--';
+    const isReserved = sub.reserved === true;
+    const isUbiVol = sub.kind === 'ubi-volume';
+    const typeLabel = isUbiVol ? 'UBI volume' : 'sub-partition';
+    const badgeClass = isUbiVol ? 'badge-ubi' : 'badge-ff';
+    const badgeText = isUbiVol ? 'UBI' : 'raw';
+    if (isReserved) tr.classList.add('reserved-row');
+
+    const mapKey = 'p' + parentIdx + ':' + subIdx;
+
+    // If the parent has share_sub_image on, every non-reserved child
+    // shows a "shared with parent" note instead of its own dropdown.
+    const parent = currentLayout.partitions[parentIdx];
+    const parentShares = parent && parent.share_sub_image === true;
+
+    // Image cell: reserved (padding / hardware region) → locked, otherwise dropdown
+    let imgCell;
+    if (isReserved) {
+      imgCell = '<td class="image-cell reserved-cell"><span class="reserved-note">N/A</span></td>';
+    } else if (parentShares && !isUbiVol) {
+      imgCell = '<td class="image-cell reserved-cell"><span class="reserved-note">— shared with parent —</span></td>';
+    } else {
+      let imgOptions = '<option value="">-- none --</option>';
+      imagePool.forEach(item => {
+        const selAttr = (partitionImageMap[mapKey] === item.id) ? ' selected' : '';
+        imgOptions += '<option value="' + item.id + '"' + selAttr + '>' + escapeHtml(item.name) + ' (' + formatSize(item.size) + ')</option>';
+      });
+      imgCell =
+        '<td class="image-cell" data-sub-key="' + escapeHtml(mapKey) + '">' +
+        '<select class="image-select" data-sub-key="' + escapeHtml(mapKey) + '">' +
+        imgOptions + '</select></td>';
+    }
+
+    // Sub-partition start is locked for UBI volumes (they're positioned by
+    // the UBI builder) and for reserved regions; raw editable sub-parts keep
+    // their start field open.
+    const startReadonly = isUbiVol || isReserved ? ' readonly' : '';
+    const nameReadonly = isReserved ? ' readonly' : '';
+    const sizeReadonly = isReserved ? ' readonly' : '';
+
+    // Delete button for this sub-partition (hidden on reserved rows)
+    const subDeleteCell = isReserved
+      ? '<td></td>'
+      : '<td><button class="btn-delete" data-delete-sub="' + parentIdx + ':' + subIdx + '" title="Remove sub-partition">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+        '</button></td>';
+
+    // Offset cell: UBI volumes have no offset (the UBI builder positions
+    // them) — show a dim em-dash instead. Raw sub-parts get a real
+    // parent-relative offset input.
+    const offsetCell = isUbiVol
+      ? '<td><span class="cell-readonly">—</span></td>'
+      : '<td><input class="cell-edit num" type="text" value="' + escapeHtml(String(startVal)) + '"' + startReadonly + ' data-field="sub-start" data-parent="' + parentIdx + '" data-idx="' + subIdx + '"></td>';
+
+    tr.innerHTML =
+      '<td><input class="cell-edit cell-edit-name ubi-vol-name" type="text" value="' + escapeHtml(sub.name) + '"' + nameReadonly + ' data-field="sub-name" data-parent="' + parentIdx + '" data-idx="' + subIdx + '"></td>' +
+      offsetCell +
+      '<td><input class="cell-edit num" type="text" value="' + escapeHtml(String(sizeVal)) + '"' + sizeReadonly + ' data-field="sub-size" data-parent="' + parentIdx + '" data-idx="' + subIdx + '"></td>' +
+      '<td><span class="size-human num">' + escapeHtml(String(human)) + '</span></td>' +
+      '<td><span class="badge ' + badgeClass + '" title="' + escapeHtml(typeLabel) + '">' + badgeText + '</span></td>' +
+      imgCell +
+      subDeleteCell;
+
+    if (!isReserved) {
+      const delBtn = tr.querySelector('[data-delete-sub]');
+      if (delBtn) {
+        delBtn.addEventListener('click', () => {
+          const parent = currentLayout.partitions[parentIdx];
+          if (!parent || !Array.isArray(parent.sub_partitions)) return;
+          parent.sub_partitions.splice(subIdx, 1);
+          if (parent.sub_partitions.length === 0) parent.sub_partitions = null;
+          appendAndRefresh();
+        });
+      }
+    }
+
+    // Editable field handlers — mutate currentLayout.partitions[parent].sub_partitions[sub]
+    tr.querySelectorAll('input.cell-edit').forEach(input => {
+      input.addEventListener('change', () => {
+        const field = input.dataset.field;
+        const pIdx = parseInt(input.dataset.parent, 10);
+        const sIdx = parseInt(input.dataset.idx, 10);
+        const target = currentLayout.partitions[pIdx]?.sub_partitions?.[sIdx];
+        if (!target) return;
+        if (field === 'sub-name') {
+          target.name = input.value;
+        } else if (field === 'sub-start') {
+          target.start = input.value;
+        } else if (field === 'sub-size') {
+          target.size = input.value;
+          const humanSpan = tr.querySelector('.size-human');
+          if (humanSpan) humanSpan.textContent = formatSize(parseHexOrDec(input.value));
+        }
+        // Full re-render so bounds-check picks up the sub-partition edit
+        // and shows the overflow-row highlight / banner message.
+        renderPartitionTable();
+        renderLayoutVisualization();
+      });
+    });
+
+    // Image selector handler (only present for non-reserved)
+    if (!isReserved) {
+      const imgSelect = tr.querySelector('select.image-select');
+      if (imgSelect) {
+        imgSelect.addEventListener('change', () => {
+          const val = imgSelect.value;
+          if (val) {
+            partitionImageMap[mapKey] = parseInt(val, 10);
+          } else {
+            delete partitionImageMap[mapKey];
+          }
+        });
+
+        // Drag-drop
+        const imgCellEl = tr.querySelector('.image-cell');
+        imgCellEl.addEventListener('dragover', (e) => { e.preventDefault(); imgCellEl.classList.add('drag-over'); });
+        imgCellEl.addEventListener('dragleave', () => imgCellEl.classList.remove('drag-over'));
+        imgCellEl.addEventListener('drop', (e) => {
+          e.preventDefault();
+          imgCellEl.classList.remove('drag-over');
+          const poolId = parseInt(e.dataTransfer.getData('text/plain'), 10);
+          if (!isNaN(poolId) && imagePool.some(item => item.id === poolId)) {
+            partitionImageMap[mapKey] = poolId;
+            imgSelect.value = String(poolId);
+          }
+        });
+      }
+    }
+
+    return tr;
+  }
+
+  // ============================================================
+  // Add Partition — single button appends a leaf normal partition;
+  // users then pick a type (normal / ubi) inline and add sub-parts
+  // / volumes from each row as needed.
+  // ============================================================
+  function ensureLayout() {
+    if (!currentLayout) {
+      currentLayout = { partitions: [], pad_byte: getDefaultPad(getActiveFlashType()) };
+    }
+    if (!currentLayout.partitions) currentLayout.partitions = [];
+    return currentLayout.partitions;
+  }
+
+  function nextTopOffset(parts) {
+    if (parts.length === 0) return 0;
+    const last = parts[parts.length - 1];
+    return parseHexOrDec(last.start) + parseHexOrDec(last.size);
+  }
+
+  function appendAndRefresh() {
+    renderPartitionTable();
+    renderLayoutVisualization();
+  }
+
+  /**
+   * Infer a partition's "type" (normal | ubi) from its children. If any
+   * child has kind=ubi-volume, the partition is a UBI container; otherwise
+   * it's a normal partition (leaf or with raw sub-parts). A new partition
+   * created via the button starts as normal with no children.
+   */
+  function partitionType(p) {
+    if (p.type === 'ubi' || p.type === 'normal') return p.type;
+    const subs = Array.isArray(p.sub_partitions) ? p.sub_partitions : [];
+    return subs.some((s) => s.kind === 'ubi-volume') ? 'ubi' : 'normal';
+  }
+
+  $('btn-add-partition').addEventListener('click', () => {
+    const parts = ensureLayout();
+    const start = nextTopOffset(parts);
+    parts.push({
+      name: 'new_partition',
+      start: '0x' + start.toString(16).toUpperCase(),
+      size: '0x' + (0x40000).toString(16).toUpperCase(),
+      pad: getDefaultPad(getActiveFlashType()),
+      type: 'normal',
+    });
+    appendAndRefresh();
+  });
+
+  /**
+   * Append a new sub-partition row to the container at `parentIdx`. The
+   * kind of the new entry is picked from the parent's type selector:
+   *   - normal → raw sub-partition with an auto-positioned start/size
+   *   - ubi    → ubi-volume with size only
+   */
+  window.__addSubPart = function(parentIdx) {
+    const parent = currentLayout?.partitions?.[parentIdx];
+    if (!parent) return;
+    if (!Array.isArray(parent.sub_partitions)) parent.sub_partitions = [];
+    const subs = parent.sub_partitions;
+    const prev = subs[subs.length - 1];
+    const type = partitionType(parent);
+    const defaultSize = prev?.size || '0x80000';
+
+    if (type === 'ubi') {
+      subs.push({
+        name: 'vol' + subs.length,
+        size: defaultSize,
+        start: null,
+        reserved: false,
+        kind: 'ubi-volume',
+        vol_id: subs.length,
+      });
+    } else {
+      // Raw sub-part: position it after the previous one. First sub-part
+      // starts at 0 (parent-relative).
+      const prevStart = prev ? parseHexOrDec(prev.start) : 0;
+      const prevSize = prev ? parseHexOrDec(prev.size) : 0;
+      const newStart = prev ? prevStart + prevSize : 0;
+      subs.push({
+        name: 'sub' + subs.length,
+        start: '0x' + newStart.toString(16).toUpperCase(),
+        size: defaultSize,
+        reserved: false,
+        kind: 'raw',
+      });
+    }
+    appendAndRefresh();
+  };
+
+  /**
+   * Change a partition's type. Wipes sub_partitions — the new type's
+   * first child is created on the user's next click of "+ Sub-part" or
+   * "+ Volume".
+   */
+  window.__setPartitionType = function(idx, newType) {
+    const p = currentLayout?.partitions?.[idx];
+    if (!p) return;
+    p.type = newType;
+    // Clear children that don't match the new type. Raw→UBI or UBI→raw
+    // are always structural — no useful migration path.
+    p.sub_partitions = null;
+    appendAndRefresh();
+  };
+
+  // ============================================================
+  // GPT buttons visibility
+  // ============================================================
+  function updateGptButtons() {
+    const ft = getActiveFlashType();
+    $gptButtons.classList.toggle('visible', isEmmcSd(ft));
+  }
+
+  // ============================================================
+  // Layout Visualization
+  // ============================================================
+  /**
+   * The visualization card is hidden unless the user has either picked
+   * a flash model from the Flash Information panel or explicitly
+   * switched into custom mode. Until one of those happens there's no
+   * known flash capacity and drawing a bar would be misleading.
+   */
+  function isLayoutVizReady() {
+    if (flashInfoMode === 'custom') return true;
+    if (flashInfoMode === 'model' && selectedModel) return true;
+    return false;
+  }
+
+  function renderLayoutVisualization() {
+    const card = $('layout-viz-card');
+    if (card) card.style.display = isLayoutVizReady() ? '' : 'none';
+
+    $layoutBar.innerHTML = '';
+    $layoutLegend.innerHTML = '';
+    if (!isLayoutVizReady()) {
+      $utilBar.style.display = 'none';
+      return;
+    }
+    if (!currentLayout || !currentLayout.partitions || currentLayout.partitions.length === 0) {
+      $utilBar.style.display = 'none';
+      return;
+    }
+    const parts = currentLayout.partitions;
+    let maxEnd = 0;
+    const parsed = parts.map((p, i) => {
+      const start = parseHexOrDec(p.start);
+      const size = parseHexOrDec(p.size);
+      const end = start + size;
+      if (end > maxEnd) maxEnd = end;
+      return {
+        name: p.name,
+        start, size, end,
+        reserved: p.reserved === true,
+        color: PARTITION_COLORS[i % PARTITION_COLORS.length],
+      };
+    });
+
+    if (maxEnd === 0) { $utilBar.style.display = 'none'; return; }
+
+    parsed.forEach(p => {
+      const pct = (p.size / maxEnd) * 100;
+      if (pct < 0.1) return;
+      const seg = document.createElement('div');
+      seg.className = p.reserved ? 'layout-segment reserved' : 'layout-segment';
+      seg.style.width = Math.max(pct, 0.5) + '%';
+      if (p.reserved) {
+        seg.style.background =
+          'repeating-linear-gradient(135deg,' + p.color + ' 0 6px, rgba(255,255,255,0.5) 6px 12px)';
+      } else {
+        seg.style.background = p.color;
+      }
+      const tipSuffix = p.reserved ? ' [reserved — auto-generated]' : '';
+      seg.setAttribute('data-tooltip', p.name + ' @ ' + formatHex(p.start) + ' (' + formatSize(p.size) + ')' + tipSuffix);
+      if (pct > 5) {
+        seg.innerHTML = '<span class="seg-label">' + escapeHtml(p.name) + '</span>';
+      }
+      $layoutBar.appendChild(seg);
+    });
+
+    parsed.forEach(p => {
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      item.innerHTML = '<span class="legend-swatch" style="background:' + p.color + '"></span>' +
+        '<span>' + escapeHtml(p.name) + '</span>' +
+        '<span class="legend-offset">' + formatHex(p.start) + '</span>';
+      $layoutLegend.appendChild(item);
+    });
+
+    // Utilization
+    const totalUsed = parsed.reduce((s, p) => s + p.size, 0);
+    let totalFlash = maxEnd;
+    if (selectedModel && typeof selectedModel.size === 'number' && selectedModel.size > 0) {
+      totalFlash = selectedModel.size;
+    }
+    const pct = Math.min(100, (totalUsed / totalFlash) * 100);
+    $utilFill.style.width = pct.toFixed(1) + '%';
+    $utilPct.textContent = pct.toFixed(1) + '%';
+    $utilBar.style.display = 'flex';
+  }
+
+  // ============================================================
+  // Config change handlers
+  // ============================================================
+  function onQuickSetupChange() {
+    loadFlashModels();
+    refreshAvailableOptions();
+    rebuildLayout();
+    if (flashInfoMode === 'custom') {
+      updateCustomCapacityOptions();
+      updateCustomFlashInfo();
+    }
+  }
+
+  $platform.addEventListener('change', () => {
+    refreshFlashTypes();
+    onQuickSetupChange();
+  });
+
+  $flash.addEventListener('change', onQuickSetupChange);
+  $osDist.addEventListener('change', () => {
+    refreshAvailableOptions();
+    rebuildLayout();
+  });
+
+  $flashCustom.addEventListener('change', () => {
+    loadFlashModels();
+    rebuildLayout();
+    if (flashInfoMode === 'custom') {
+      updateCustomCapacityOptions();
+      updateCustomFlashInfo();
+    }
+  });
+
+  // ============================================================
+  // Action: Pack Image
+  // ============================================================
+  $('btn-pack').addEventListener('click', async () => {
+    if (!currentLayout || !currentLayout.partitions) {
+      showToast('No partition layout available.', 'error');
+      return;
+    }
+
+    // Collect every assigned image into { name: Uint8Array } for
+    // wasm.pack(options_json, images). Key formats:
+    //   'p<idx>'       — leaf top-level partition (name = partition.name)
+    //   'p<idx>:<sub>' — sub-partition; both the sub name AND the parent
+    //                     name are registered, so that raw multi-copy
+    //                     containers like BL2 can satisfy the core's
+    //                     `image_by_name("bl2")` lookup.
+    const images = {};
+    for (const key in partitionImageMap) {
+      const poolId = partitionImageMap[key];
+      const poolItem = imagePool.find(p => p.id === poolId);
+      if (!poolItem) continue;
+
+      if (key.startsWith('p')) {
+        const rest = key.slice(1);
+        const colonIdx = rest.indexOf(':');
+        if (colonIdx >= 0) {
+          // Sub-partition
+          const parentIdx = parseInt(rest.slice(0, colonIdx), 10);
+          const subIdx = parseInt(rest.slice(colonIdx + 1), 10);
+          const parent = currentLayout.partitions[parentIdx];
+          const sub = parent?.sub_partitions?.[subIdx];
+          if (sub && !sub.reserved) {
+            images[sub.name] = poolItem.data;
+            // Also surface the image under the parent partition name so the
+            // Rust core can pick it up via `image_by_name("bl2")` when every
+            // sub-part carries the same binary. Last-write wins (copies
+            // should be identical; UI enforces via "Apply to all" button).
+            if (parent?.name && !images[parent.name]) {
+              images[parent.name] = poolItem.data;
+            }
+          }
+        } else {
+          const idx = parseInt(rest, 10);
+          const part = currentLayout.partitions[idx];
+          const isContainer = part && Array.isArray(part.sub_partitions) && part.sub_partitions.length > 0;
+          // Leaf top-level partition → register under its own name.
+          // Container with `share_sub_image` on → register under the
+          // parent name too; the Rust core will fan it out to every
+          // non-reserved raw sub-part via `image_by_name`.
+          // Plain (non-shared) containers are skipped — images live
+          // on the sub-part keys.
+          if (part && !part.reserved) {
+            if (!isContainer || part.share_sub_image === true) {
+              images[part.name] = poolItem.data;
+            }
+          }
+        }
+      }
+    }
+
+    // BL2 is always required for NAND/NOR/SD flash images.
+    const flash = getActiveFlashType();
+    const needsBl2 = flash !== 'emmc';
+    if (needsBl2 && !images.bl2) {
+      showToast('BL2 image is required. Assign it in the partition table.', 'error');
+      return;
+    }
+
+    showToast('Packing image...', '');
+    try {
+      const platform = currentTab === 'quick' ? $platform.value : 'mt7981';
+      const optionsJson = buildOptionsJson();
+      const result = wasm.pack(platform, flash, optionsJson, images);
+      if (!result || result.length === 0) {
+        showToast('Pack returned empty result.', 'error');
+        return;
+      }
+
+      downloadBlob(result, platform + '_' + flash + '.img');
+      showToast('Image packed successfully! (' + formatSize(result.length) + ')', 'success');
+    } catch (e) {
+      console.error('pack failed:', e);
+      showToast('Pack failed: ' + (e.message || e), 'error');
+    }
+  });
+
+  // ============================================================
+  // Action: Download YAML
+  // ============================================================
+  $('btn-download-yaml').addEventListener('click', () => {
+    if (!currentLayout || !currentLayout.partitions) {
+      showToast('No layout to export.', 'error');
+      return;
+    }
+    const ft = getActiveFlashType();
+    let yaml = '# BinSketch - Partition Layout\n';
+    yaml += '# Flash Type: ' + ft + '\n\n';
+    if (currentTab === 'quick') {
+      yaml += 'platform: ' + $platform.value + '\n';
+    }
+    yaml += 'flash_type: ' + ft + '\n';
+    yaml += 'pad_byte: "' + (currentLayout.pad_byte || '0xFF') + '"\n\n';
+    yaml += 'partitions:\n';
+    currentLayout.partitions.forEach(p => {
+      yaml += '  - name: ' + p.name + '\n';
+      yaml += '    start: "' + formatHex(p.start) + '"\n';
+      yaml += '    size: "' + formatHex(p.size) + '"\n';
+      if (p.pad) yaml += '    pad: "' + p.pad + '"\n';
+      yaml += '\n';
+    });
+
+    const platform = currentTab === 'quick' ? $platform.value : 'custom';
+    downloadBlob(new TextEncoder().encode(yaml), platform + '_' + ft + '.yaml');
+    showToast('YAML downloaded.', 'success');
+  });
+
+  // ============================================================
+  // Action: Load YAML
+  // ============================================================
+  $('btn-load-yaml').addEventListener('click', () => {
+    $yamlFileInput.click();
+  });
+
+  $yamlFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = parseSimpleYaml(text);
+
+      if (parsed.platform) {
+        const opt = Array.from($platform.options).find(o => o.value === parsed.platform);
+        if (opt) $platform.value = parsed.platform;
+      }
+      if (parsed.flash_type) {
+        refreshFlashTypes();
+        const opt = Array.from($flash.options).find(o => o.value === parsed.flash_type);
+        if (opt) $flash.value = parsed.flash_type;
+      }
+
+      loadFlashModels();
+      updateGptButtons();
+
+      if (parsed.partitions && parsed.partitions.length > 0) {
+        currentLayout = {
+          partitions: parsed.partitions.map(p => ({
+            name: p.name || 'unnamed',
+            start: p.start || '0x0',
+            size: p.size || '0x0',
+            pad: p.pad || parsed.pad_byte || getDefaultPad(getActiveFlashType())
+          })),
+          pad_byte: parsed.pad_byte || getDefaultPad(getActiveFlashType())
+        };
+        partitionImageMap = {};
+        renderPartitionTable();
+        renderLayoutVisualization();
+        showToast('YAML loaded: ' + parsed.partitions.length + ' partitions.', 'success');
+      } else {
+        showToast('No partitions found in YAML.', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to parse YAML: ' + (err.message || err), 'error');
+    }
+    $yamlFileInput.value = '';
+  });
+
+  function parseSimpleYaml(text) {
+    const result = { partitions: [] };
+    const lines = text.split('\n');
+    let currentPartition = null;
+    let inPartitions = false;
+
+    for (const rawLine of lines) {
+      const line = rawLine.replace(/\r$/, '');
+      if (/^\s*#/.test(line) || /^\s*$/.test(line)) continue;
+
+      const topMatch = line.match(/^(\w[\w_]*):\s*(.+)?$/);
+      if (topMatch && !inPartitions) {
+        const key = topMatch[1];
+        let val = (topMatch[2] || '').replace(/^["']|["']$/g, '').trim();
+        if (key === 'platform') result.platform = val;
+        else if (key === 'flash_type') result.flash_type = val;
+        else if (key === 'mode') result.mode = val;
+        else if (key === 'pad_byte') result.pad_byte = val;
+        else if (key === 'partitions') inPartitions = true;
+        continue;
+      }
+
+      if (line.match(/^partitions:\s*$/)) {
+        inPartitions = true;
+        continue;
+      }
+
+      if (inPartitions) {
+        const newEntry = line.match(/^\s+-\s+(\w+):\s*(.+)?$/);
+        if (newEntry) {
+          currentPartition = {};
+          const key = newEntry[1];
+          let val = (newEntry[2] || '').replace(/^["']|["']$/g, '').trim();
+          currentPartition[key] = val;
+          result.partitions.push(currentPartition);
+          continue;
+        }
+        const contMatch = line.match(/^\s+(\w+):\s*(.+)?$/);
+        if (contMatch && currentPartition) {
+          const key = contMatch[1];
+          let val = (contMatch[2] || '').replace(/^["']|["']$/g, '').trim();
+          currentPartition[key] = val;
+        }
+      }
+    }
+    return result;
+  }
+
+  // ============================================================
+  // Action: Dump Layout
+  // ============================================================
+  $('btn-dump-layout').addEventListener('click', () => {
+    if (!currentLayout || !currentLayout.partitions) {
+      showToast('No layout to dump.', 'error');
+      return;
+    }
+    // Build a text dump from current layout
+    let text = 'Flash Layout Dump\n';
+    text += '='.repeat(60) + '\n\n';
+    text += 'Flash Type: ' + (currentLayout.flash_type || getActiveFlashType()) + '\n';
+    text += 'Pad Byte:   ' + (currentLayout.pad_byte || '0xFF') + '\n\n';
+    text += 'Partitions:\n';
+    text += '-'.repeat(60) + '\n';
+    text += 'Name'.padEnd(20) + 'Offset'.padEnd(14) + 'Size (hex)'.padEnd(14) + 'Size\n';
+    text += '-'.repeat(60) + '\n';
+    currentLayout.partitions.forEach(p => {
+      const start = formatHex(p.start);
+      const size = formatHex(p.size);
+      const human = formatSize(parseHexOrDec(p.size));
+      text += p.name.padEnd(20) + start.padEnd(14) + size.padEnd(14) + human + '\n';
+    });
+    text += '-'.repeat(60) + '\n';
+
+    $dumpContent.textContent = text;
+    $dumpModal.classList.add('open');
+  });
+
+  $('dump-modal-close').addEventListener('click', () => {
+    $dumpModal.classList.remove('open');
+  });
+  $dumpModal.addEventListener('click', (e) => {
+    if (e.target === $dumpModal) $dumpModal.classList.remove('open');
+  });
+
+  // ============================================================
+  // GPT Download
+  // ============================================================
+  function downloadGpt(type) {
+    if (!currentLayout || !currentLayout.partitions) {
+      showToast('No partition layout available.', 'error');
+      return;
+    }
+    const diskSize = getFlashCapacity();
+    if (!diskSize || diskSize <= 0) {
+      showToast('Please select a flash model or set a custom capacity first.', 'error');
+      return;
+    }
+    const parts = currentLayout.partitions
+      .filter(p => p.name.toLowerCase() !== 'gpt')
+      .map(p => ({
+        name: p.name,
+        start: parseHexOrDec(p.start),
+        size: parseHexOrDec(p.size)
+      }));
+    const partitionsJson = JSON.stringify(parts);
+
+    try {
+      let result;
+      if (type === 'primary') {
+        result = wasm.generate_primary_gpt(partitionsJson, diskSize);
+      } else {
+        result = wasm.generate_secondary_gpt(partitionsJson, diskSize);
+      }
+      if (!result || result.length === 0) {
+        showToast('GPT generation returned empty result.', 'error');
+        return;
+      }
+      downloadBlob(result, type + '_gpt.bin');
+      showToast(type.charAt(0).toUpperCase() + type.slice(1) + ' GPT downloaded (' + formatSize(result.length) + ').', 'success');
+    } catch (err) {
+      showToast('GPT generation failed: ' + (err.message || err), 'error');
+    }
+  }
+
+  $('btn-download-primary-gpt').addEventListener('click', () => downloadGpt('primary'));
+  $('btn-download-secondary-gpt').addEventListener('click', () => downloadGpt('secondary'));
+
+  // ============================================================
+  // Initial load
+  // ============================================================
+  onQuickSetupChange();
+
+})();
+</script>
+</body>
+</html>
