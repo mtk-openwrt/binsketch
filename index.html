@@ -645,6 +645,34 @@ tr.overflow-row > td:first-child {
   color: var(--ink2);
 }
 
+/* Size cell: input + "= file" button side by side */
+.size-cell {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.size-cell .cell-edit {
+  flex: 1;
+  min-width: 0;
+}
+.btn-use-filesize {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  font-size: 10px;
+  color: var(--ink3);
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.6;
+}
+.btn-use-filesize:hover {
+  background: var(--accent-lt);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 /* Name cell hosts the name input and an inline type selector
  * (normal / UBI). The input grows to fill the remaining space;
  * the dropdown is pinned to ~70px on the right so the name
@@ -2655,7 +2683,10 @@ td.drag-over {
       typeSelect +
       '</div></td>' +
       '<td><input class="cell-edit num" type="text" value="' + escapeHtml(String(startVal)) + '"' + startAttr + ' data-field="start" data-idx="' + idx + '"></td>' +
-      '<td><input class="cell-edit num" type="text" value="' + escapeHtml(String(sizeVal)) + '"' + sizeAttr + ' data-field="size" data-idx="' + idx + '"></td>' +
+      '<td><div class="size-cell">' +
+        '<input class="cell-edit num" type="text" value="' + escapeHtml(String(sizeVal)) + '"' + sizeAttr + ' data-field="size" data-idx="' + idx + '">' +
+        (!isSizeLocked && !isContainer ? '<button class="btn-use-filesize" data-kind="part" data-idx="' + idx + '" title="Set to assigned image file size">= file</button>' : '') +
+      '</div></td>' +
       '<td><span class="size-human num">' + escapeHtml(String(human)) + '</span></td>' +
       '<td><span class="badge ' + badgeClass + '">' + escapeHtml(String(pad)) + '</span></td>' +
       imgCell +
@@ -2698,6 +2729,21 @@ td.drag-over {
         renderLayoutVisualization();
       });
     });
+
+    // "= file" button — sets this partition's size to the assigned image size.
+    const filesizeBtn = tr.querySelector('.btn-use-filesize[data-kind="part"]');
+    if (filesizeBtn) {
+      filesizeBtn.addEventListener('click', () => {
+        const i = parseInt(filesizeBtn.dataset.idx, 10);
+        const poolId = partitionImageMap['p' + i];
+        const item = poolId !== undefined ? imagePool.find(p => p.id === poolId) : null;
+        if (!item) { showToast('Assign an image first', 'warning'); return; }
+        const hexSize = '0x' + item.size.toString(16).toUpperCase();
+        currentLayout.partitions[i].size = hexSize;
+        renderPartitionTable();
+        renderLayoutVisualization();
+      });
+    }
 
     // Share-image checkbox handler on normal containers.
     if (canShareImage) {
@@ -2848,7 +2894,10 @@ td.drag-over {
     tr.innerHTML =
       '<td><input class="cell-edit cell-edit-name ubi-vol-name" type="text" value="' + escapeHtml(sub.name) + '"' + nameReadonly + ' data-field="sub-name" data-parent="' + parentIdx + '" data-idx="' + subIdx + '"></td>' +
       offsetCell +
-      '<td><input class="cell-edit num" type="text" value="' + escapeHtml(String(sizeVal)) + '"' + sizeReadonly + ' data-field="sub-size" data-parent="' + parentIdx + '" data-idx="' + subIdx + '"></td>' +
+      '<td><div class="size-cell">' +
+        '<input class="cell-edit num" type="text" value="' + escapeHtml(String(sizeVal)) + '"' + sizeReadonly + ' data-field="sub-size" data-parent="' + parentIdx + '" data-idx="' + subIdx + '">' +
+        (!sizeReadonly ? '<button class="btn-use-filesize" data-kind="sub" data-parent="' + parentIdx + '" data-idx="' + subIdx + '" title="Set to assigned image file size">= file</button>' : '') +
+      '</div></td>' +
       '<td><span class="size-human num">' + escapeHtml(String(human)) + '</span></td>' +
       '<td><span class="badge ' + badgeClass + '" title="' + escapeHtml(typeLabel) + '">' + badgeText + '</span></td>' +
       imgCell +
@@ -2890,6 +2939,26 @@ td.drag-over {
         renderLayoutVisualization();
       });
     });
+
+    // "= file" button on sub-partition size cell.
+    const subFilesizeBtn = tr.querySelector('.btn-use-filesize[data-kind="sub"]');
+    if (subFilesizeBtn) {
+      subFilesizeBtn.addEventListener('click', () => {
+        const pI = parseInt(subFilesizeBtn.dataset.parent, 10);
+        const sI = parseInt(subFilesizeBtn.dataset.idx, 10);
+        const key = 'p' + pI + ':' + sI;
+        const poolId = partitionImageMap[key];
+        const item = poolId !== undefined ? imagePool.find(p => p.id === poolId) : null;
+        if (!item) { showToast('Assign an image first', 'warning'); return; }
+        const hexSize = '0x' + item.size.toString(16).toUpperCase();
+        const target = currentLayout.partitions[pI]?.sub_partitions?.[sI];
+        if (target) {
+          target.size = hexSize;
+          renderPartitionTable();
+          renderLayoutVisualization();
+        }
+      });
+    }
 
     // Image selector handler (only present for non-reserved)
     if (!isReserved) {
