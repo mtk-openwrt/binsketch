@@ -1,8 +1,19 @@
 <!DOCTYPE html>
+<!--
+  Copyright (c) 2026 MediaTek Inc. All rights reserved.
+  Author: Sky Huang <SkyLake.Huang@mediatek.com>
+
+  This software is proprietary to MediaTek Inc. and is provided for
+  internal development use only. Unauthorized copying, modification,
+  distribution, or use, via any medium, is strictly prohibited without
+  the prior written permission of MediaTek Inc.
+-->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="author" content="Sky Huang <SkyLake.Huang@mediatek.com>">
+<meta name="copyright" content="© 2026 MediaTek Inc. All rights reserved.">
 <title>BinSketch</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -92,7 +103,10 @@ header .version-badge {
 
 /* Container */
 .container {
-  max-width: 1140px;
+  /* Wider to let the partition table fit without horizontal scrolling
+   * on common 1280-1440 viewports. Below 1280 the wrapper still scrolls
+   * horizontally if needed (.table-wrapper has overflow-x: auto). */
+  max-width: 1320px;
   margin: 0 auto;
   padding: 24px 20px 60px;
 }
@@ -471,14 +485,14 @@ thead th {
   letter-spacing: 0.5px;
   color: var(--ink3);
   background: var(--surface2);
-  padding: 10px 14px;
+  padding: 10px 8px;
   text-align: left;
   border-bottom: 1px solid var(--border2);
   white-space: nowrap;
 }
 
 tbody td {
-  padding: 10px 14px;
+  padding: 10px 8px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
@@ -523,14 +537,16 @@ tr.ubi-volume-row:hover td {
   background: rgba(91,106,240,0.06);
 }
 
-/* First column of UBI volume rows: tree connector + name input */
-tr.ubi-volume-row td:first-child {
+/* Second column of UBI volume rows (name cell): tree connector.
+ * Column 1 is the inclusion checkbox, so the connector now attaches
+ * to td:nth-child(2) — the name input cell. */
+tr.ubi-volume-row td:nth-child(2) {
   position: relative;
   padding-left: 36px;
 }
 
 /* Vertical line spanning the row (top to bottom) */
-tr.ubi-volume-row td:first-child::before {
+tr.ubi-volume-row td:nth-child(2)::before {
   content: '';
   position: absolute;
   left: 14px;
@@ -542,7 +558,7 @@ tr.ubi-volume-row td:first-child::before {
 }
 
 /* Horizontal branch (L shape) — meets the input vertically centered */
-tr.ubi-volume-row td:first-child::after {
+tr.ubi-volume-row td:nth-child(2)::after {
   content: '';
   position: absolute;
   left: 14px;
@@ -554,7 +570,7 @@ tr.ubi-volume-row td:first-child::after {
 }
 
 /* Last UBI volume row: vertical line stops at the L corner (top half only) */
-tr.ubi-volume-row.ubi-vol-last td:first-child::before {
+tr.ubi-volume-row.ubi-vol-last td:nth-child(2)::before {
   bottom: auto;
   height: 50%;
 }
@@ -614,16 +630,46 @@ tr.overflow-row > td:first-child {
  * columns a sensible floor so they don't steal space either. */
 #partition-table {
   table-layout: auto;
-  min-width: 820px;
+  min-width: 780px;
 }
+/* col 1: include checkbox */
 #partition-table th:nth-child(1),
-#partition-table td:nth-child(1) { min-width: 220px; }
+#partition-table td:nth-child(1) { width: 24px; min-width: 24px; padding: 0 2px; text-align: center; }
+/* col 2: name (no longer hosts type-select) */
 #partition-table th:nth-child(2),
-#partition-table td:nth-child(2) { min-width: 110px; }
+#partition-table td:nth-child(2) { min-width: 120px; }
+/* col 3: offset */
 #partition-table th:nth-child(3),
-#partition-table td:nth-child(3) { min-width: 110px; }
+#partition-table td:nth-child(3) { min-width: 90px; }
+/* col 4: size (hex) */
+#partition-table th:nth-child(4),
+#partition-table td:nth-child(4) { min-width: 90px; }
+/* col 5: human size — force nowrap so "128 KiB" stays on one line */
+#partition-table th:nth-child(5),
+#partition-table td:nth-child(5) { min-width: 60px; white-space: nowrap; }
+/* col 6: pad byte badge */
 #partition-table th:nth-child(6),
-#partition-table td:nth-child(6) { min-width: 200px; }
+#partition-table td:nth-child(6) { white-space: nowrap; }
+/* col 7: image dropdown */
+#partition-table th:nth-child(7),
+#partition-table td:nth-child(7) { min-width: 180px; }
+/* col 8: actions (type-select + add + delete) */
+#partition-table th:nth-child(8),
+#partition-table td:nth-child(8) { min-width: 160px; white-space: nowrap; }
+
+/* Keep image-cell content from wrapping. The share checkbox used to drop
+ * to a second line on container rows (bl2 with share toggle) making the
+ * row ~20px taller. white-space:nowrap + vertical-align keeps everything
+ * on one line without switching the td away from table-cell display. */
+#partition-table .image-cell { white-space: nowrap; }
+#partition-table .image-cell .reserved-note,
+#partition-table .image-cell > select.image-select,
+#partition-table .image-cell > .share-toggle {
+  vertical-align: middle;
+}
+#partition-table .image-cell > select.image-select {
+  max-width: calc(100% - 90px); /* reserve space for share-toggle */
+}
 
 /* Share-image toggle inside the image cell on normal containers */
 .share-toggle {
@@ -646,6 +692,56 @@ tr.overflow-row > td:first-child {
 }
 
 /* Size cell: input + "= file" button side by side */
+.incl-cell {
+  width: 24px;
+  min-width: 24px;
+  text-align: center;
+  padding: 0 2px;
+}
+.incl-cell input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--accent);
+  margin: 0;
+}
+/* Actions tail cell: type-select + =file + +Sub/+Vol + delete.
+ * KEEP the td as display:table-cell so it fills the row height.
+ * Using display:flex on a <td> collapses the cell to the flex
+ * container's content height (~27px) and anchors it to the top of
+ * the row, producing a large white gap below — a mistake I made
+ * in an earlier iteration. vertical-align:middle on the td centers
+ * inline-block children naturally. */
+.actions-cell {
+  white-space: nowrap;
+  vertical-align: middle;
+  padding: 2px 4px;
+  text-align: left;
+}
+/* Uniform 22px height for every interactive child; inline-block so
+ * vertical-align:middle applies. margin-right replaces flex gap. */
+.actions-cell > *,
+.actions-cell > select.type-select {
+  display: inline-block;
+  vertical-align: middle;
+  height: 22px;
+  box-sizing: border-box;
+  margin-right: 3px;
+}
+.actions-cell > *:last-child { margin-right: 0; }
+.btn-add-sub {
+  padding: 0 6px;
+  font-size: 10px;
+  line-height: 22px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--ink2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-add-sub:hover {
+  background: var(--surface3);
+  color: var(--ink1);
+}
 .size-cell {
   display: flex;
   align-items: center;
@@ -657,15 +753,17 @@ tr.overflow-row > td:first-child {
 }
 .btn-use-filesize {
   flex: 0 0 auto;
-  padding: 1px 5px;
+  height: 22px;
+  padding: 0 5px;
   font-size: 10px;
+  line-height: 22px;
   color: var(--ink3);
   background: var(--surface2);
   border: 1px solid var(--border2);
   border-radius: 4px;
   cursor: pointer;
   white-space: nowrap;
-  line-height: 1.6;
+  box-sizing: border-box;
 }
 .btn-use-filesize:hover {
   background: var(--accent-lt);
@@ -677,28 +775,21 @@ tr.overflow-row > td:first-child {
  * (normal / UBI). The input grows to fill the remaining space;
  * the dropdown is pinned to ~70px on the right so the name
  * always has a sensible minimum width. */
-.name-cell {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.name-cell > input.cell-edit-name {
-  flex: 1 1 auto;
-  min-width: 80px;
-}
-.name-cell > select.type-select {
-  flex: 0 0 72px;
-  width: 72px;
+/* type-select now lives in the actions-cell, not the name cell */
+.actions-cell > select.type-select {
   font-family: 'DM Sans', sans-serif;
   font-size: 11px;
-  padding: 2px 4px;
+  height: 22px;
+  padding: 0 3px;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--surface1);
   color: var(--ink2);
   cursor: pointer;
+  max-width: 62px;
+  box-sizing: border-box;
 }
-.name-cell > select.type-select:hover {
+.actions-cell > select.type-select:hover {
   border-color: var(--accent);
 }
 
@@ -813,11 +904,11 @@ td.drag-over {
 .btn svg { width: 16px; height: 16px; }
 
 .btn-delete {
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border: 1px solid var(--border2);
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--surface);
   color: var(--ink3);
   cursor: pointer;
@@ -826,6 +917,7 @@ td.drag-over {
   justify-content: center;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .btn-delete:hover {
@@ -1434,13 +1526,14 @@ td.drag-over {
         <table id="partition-table">
           <thead>
             <tr>
+              <th title="Include in packed image"><input type="checkbox" id="check-all-parts" checked title="Toggle all"></th>
               <th>Name</th>
               <th>Offset</th>
               <th>Size (hex)</th>
               <th>Size</th>
               <th>Pad</th>
               <th>Image</th>
-              <th></th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody id="partition-tbody"></tbody>
@@ -1537,6 +1630,14 @@ td.drag-over {
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
+<footer style="text-align:center; padding:16px 20px 24px; font-size:0.75rem; color:var(--ink3); line-height:1.6; border-top:1px solid var(--border); margin-top:32px;">
+  <small>
+    © 2026 MediaTek Inc. All rights reserved.
+    Internal use only — not for distribution.<br>
+    Author: Sky Huang &lt;SkyLake.Huang@mediatek.com&gt;
+  </small>
+</footer>
+
 <script type="module">
 (async function() {
   // ============================================================
@@ -1555,6 +1656,15 @@ td.drag-over {
 
   // Partition-to-image assignments: partitionIndex -> poolItemId
   let partitionImageMap = {};
+
+  // Per-partition inclusion flags. Key format matches partitionImageMap:
+  //   'p<idx>'        — top-level partition (e.g. 'p0')
+  //   'p<idx>:<sub>'  — sub-partition       (e.g. 'p0:1')
+  // true = include in packed image (default), false = exclude.
+  // Excluded partitions are skipped in the pack handler even if an image
+  // has been assigned. Useful for GPT-based layouts where some partitions
+  // are written at production time or after first boot.
+  let partitionIncludeMap = {};
 
   // Available options cache
   let availableOptions = null;
@@ -2527,13 +2637,23 @@ td.drag-over {
 
   function renderPartitionTable() {
     if (!currentLayout || !currentLayout.partitions) {
-      $tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--ink3);padding:20px;">No partitions.</td></tr>';
+      $tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--ink3);padding:20px;">No partitions.</td></tr>';
       updateBoundsWarning(null);
       return;
     }
     const parts = currentLayout.partitions;
     const padByte = currentLayout.pad_byte || getDefaultPad(getActiveFlashType());
     $tbody.innerHTML = '';
+    // Default-include any partition keys that haven't been seen before.
+    // Existing user choices are preserved across re-renders.
+    parts.forEach((p, idx) => {
+      const key = 'p' + idx;
+      if (!(key in partitionIncludeMap)) partitionIncludeMap[key] = true;
+      (p.sub_partitions || []).forEach((_, subIdx) => {
+        const subKey = 'p' + idx + ':' + subIdx;
+        if (!(subKey in partitionIncludeMap)) partitionIncludeMap[subKey] = true;
+      });
+    });
 
     const validation = validateLayout();
     parts.forEach((p, idx) => {
@@ -2651,46 +2771,57 @@ td.drag-over {
     let deleteCell;
     if (isReserved) {
       deleteCell = '<td></td>';
-    } else {
-      const addLabel = isUbiContainer ? '+ Volume' : '+ Sub-part';
-      deleteCell =
-        '<td style="display:flex;gap:4px">' +
-        '<button class="btn btn-secondary btn-sm" data-add-sub="' + idx + '" title="Add a nested sub-partition or UBI volume">' +
-        escapeHtml(addLabel) + '</button>' +
-        '<button class="btn-delete" data-delete="' + idx + '" title="Remove partition">' +
-        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
-        '</button></td>';
-    }
+    } // end reserved vs non-reserved deleteCell (now unused — actions in tail cell)
 
     const nameAttr = isReserved ? ' readonly' : '';
     const startAttr = isStartLocked ? ' readonly' : '';
     const sizeAttr = isSizeLocked ? ' readonly' : '';
 
-    // Type selector — only shown on non-reserved rows. Lets the user
-    // flip a row between a normal (raw sub-parts allowed) partition and
-    // a UBI container (ubi-volume children).
-    const typeSelect = isReserved
+    // ── Actions tail cell (type-select + =file + add-sub/volume + delete) ──
+    // All per-row action controls live here so Name/Offset/Size columns have
+    // enough horizontal space to show their content.
+    const typeSelectHtml = isReserved
       ? ''
       : '<select class="type-select" data-type-idx="' + idx + '" title="Partition type">' +
         '<option value="normal"' + (pType === 'normal' ? ' selected' : '') + '>normal</option>' +
         '<option value="ubi"' + (pType === 'ubi' ? ' selected' : '') + '>UBI</option>' +
         '</select>';
 
+    const fileBtn = (!isReserved && !isContainer)
+      ? '<button class="btn-use-filesize" data-kind="part" data-idx="' + idx + '" title="Set size to assigned image filesize">= file</button>'
+      : '';
+
+    const addBtn = isReserved
+      ? ''
+      : '<button class="btn-add-sub" data-add-sub="' + idx + '" title="' +
+        (isUbiContainer ? 'Add UBI volume' : 'Add sub-partition') + '">' +
+        (isUbiContainer ? '+Vol' : '+Sub') +
+        '</button>';
+
+    const delBtn = '<button class="btn-delete" data-delete="' + idx + '" title="Remove partition">' +
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+      '</button>';
+
+    const actionsCell = '<td class="actions-cell">' + typeSelectHtml + fileBtn + addBtn + delBtn + '</td>';
+
+    // Inclusion checkbox — always checked+disabled for reserved partitions.
+    const inclKey = 'p' + idx;
+    const inclChecked = partitionIncludeMap[inclKey] !== false ? ' checked' : '';
+    const inclDisabled = isReserved ? ' disabled' : '';
+    const inclCell = '<td class="incl-cell"><input type="checkbox" class="part-include"' +
+      inclChecked + inclDisabled + ' data-key="' + inclKey + '" title="Include in packed image"></td>';
+
     tr.innerHTML =
+      inclCell +
       '<td' + reservedTitle + '>' +
-      '<div class="name-cell">' +
       '<input class="cell-edit cell-edit-name" type="text" value="' + escapeHtml(p.name) + '"' + nameAttr + ' data-field="name" data-idx="' + idx + '">' +
-      typeSelect +
-      '</div></td>' +
+      '</td>' +
       '<td><input class="cell-edit num" type="text" value="' + escapeHtml(String(startVal)) + '"' + startAttr + ' data-field="start" data-idx="' + idx + '"></td>' +
-      '<td><div class="size-cell">' +
-        '<input class="cell-edit num" type="text" value="' + escapeHtml(String(sizeVal)) + '"' + sizeAttr + ' data-field="size" data-idx="' + idx + '">' +
-        (!isSizeLocked && !isContainer ? '<button class="btn-use-filesize" data-kind="part" data-idx="' + idx + '" title="Set to assigned image file size">= file</button>' : '') +
-      '</div></td>' +
+      '<td><input class="cell-edit num" type="text" value="' + escapeHtml(String(sizeVal)) + '"' + sizeAttr + ' data-field="size" data-idx="' + idx + '"></td>' +
       '<td><span class="size-human num">' + escapeHtml(String(human)) + '</span></td>' +
       '<td><span class="badge ' + badgeClass + '">' + escapeHtml(String(pad)) + '</span></td>' +
       imgCell +
-      deleteCell;
+      actionsCell;
 
     // Wire the type selector change
     const typeSel = tr.querySelector('select.type-select');
@@ -2877,13 +3008,6 @@ td.drag-over {
     const nameReadonly = isReserved ? ' readonly' : '';
     const sizeReadonly = isReserved ? ' readonly' : '';
 
-    // Delete button for this sub-partition (hidden on reserved rows)
-    const subDeleteCell = isReserved
-      ? '<td></td>'
-      : '<td><button class="btn-delete" data-delete-sub="' + parentIdx + ':' + subIdx + '" title="Remove sub-partition">' +
-        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
-        '</button></td>';
-
     // Offset cell: UBI volumes have no offset (the UBI builder positions
     // them) — show a dim em-dash instead. Raw sub-parts get a real
     // parent-relative offset input.
@@ -2891,17 +3015,31 @@ td.drag-over {
       ? '<td><span class="cell-readonly">—</span></td>'
       : '<td><input class="cell-edit num" type="text" value="' + escapeHtml(String(startVal)) + '"' + startReadonly + ' data-field="sub-start" data-parent="' + parentIdx + '" data-idx="' + subIdx + '"></td>';
 
+    // Inclusion checkbox for sub-partitions (disabled on reserved raw regions).
+    const subInclKey = 'p' + parentIdx + ':' + subIdx;
+    const subInclChecked = partitionIncludeMap[subInclKey] !== false ? ' checked' : '';
+    const subInclDisabled = isReserved ? ' disabled' : '';
+    const subInclCell = '<td class="incl-cell"><input type="checkbox" class="part-include"' +
+      subInclChecked + subInclDisabled + ' data-key="' + subInclKey + '" title="Include in packed image"></td>';
+
+    // Sub-partition actions cell: =file + delete
+    const subFileBtnHtml = (!isReserved && !sizeReadonly)
+      ? '<button class="btn-use-filesize" data-kind="sub" data-parent="' + parentIdx + '" data-idx="' + subIdx + '" title="Set size to filesize">= file</button>'
+      : '';
+    const subActionsCell = '<td class="actions-cell">' + subFileBtnHtml + (isReserved ? '' :
+      '<button class="btn-delete" data-delete-sub="' + parentIdx + ':' + subIdx + '" title="Remove sub-partition">' +
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+      '</button>') + '</td>';
+
     tr.innerHTML =
+      subInclCell +
       '<td><input class="cell-edit cell-edit-name ubi-vol-name" type="text" value="' + escapeHtml(sub.name) + '"' + nameReadonly + ' data-field="sub-name" data-parent="' + parentIdx + '" data-idx="' + subIdx + '"></td>' +
       offsetCell +
-      '<td><div class="size-cell">' +
-        '<input class="cell-edit num" type="text" value="' + escapeHtml(String(sizeVal)) + '"' + sizeReadonly + ' data-field="sub-size" data-parent="' + parentIdx + '" data-idx="' + subIdx + '">' +
-        (!sizeReadonly ? '<button class="btn-use-filesize" data-kind="sub" data-parent="' + parentIdx + '" data-idx="' + subIdx + '" title="Set to assigned image file size">= file</button>' : '') +
-      '</div></td>' +
+      '<td><input class="cell-edit num" type="text" value="' + escapeHtml(String(sizeVal)) + '"' + sizeReadonly + ' data-field="sub-size" data-parent="' + parentIdx + '" data-idx="' + subIdx + '"></td>' +
       '<td><span class="size-human num">' + escapeHtml(String(human)) + '</span></td>' +
       '<td><span class="badge ' + badgeClass + '" title="' + escapeHtml(typeLabel) + '">' + badgeText + '</span></td>' +
       imgCell +
-      subDeleteCell;
+      subActionsCell;
 
     if (!isReserved) {
       const delBtn = tr.querySelector('[data-delete-sub]');
@@ -3205,6 +3343,29 @@ td.drag-over {
     }
   }
 
+  // ── Per-partition inclusion checkboxes ────────────────────────────────────
+  // Event delegation: any .part-include checkbox inside the tbody updates
+  // partitionIncludeMap and syncs the "check all" master checkbox.
+  $tbody.addEventListener('change', e => {
+    const cb = e.target.closest('.part-include');
+    if (!cb) return;
+    partitionIncludeMap[cb.dataset.key] = cb.checked;
+    // Sync master: checked when all user-toggleable boxes are checked.
+    const allCbs = $tbody.querySelectorAll('.part-include:not(:disabled)');
+    const allChecked = Array.from(allCbs).every(c => c.checked);
+    const checkAll = document.getElementById('check-all-parts');
+    if (checkAll) checkAll.checked = allChecked;
+  });
+
+  // Master "check all" toggle
+  document.getElementById('check-all-parts').addEventListener('change', e => {
+    const v = e.target.checked;
+    $tbody.querySelectorAll('.part-include:not(:disabled)').forEach(cb => {
+      cb.checked = v;
+      partitionIncludeMap[cb.dataset.key] = v;
+    });
+  });
+
   $platform.addEventListener('change', () => {
     refreshFlashTypes();
     onQuickSetupChange();
@@ -3243,6 +3404,9 @@ td.drag-over {
     //                     `image_by_name("bl2")` lookup.
     const images = {};
     for (const key in partitionImageMap) {
+      // Skip partitions/sub-partitions that the user has unchecked.
+      if (partitionIncludeMap[key] === false) continue;
+
       const poolId = partitionImageMap[key];
       const poolItem = imagePool.find(p => p.id === poolId);
       if (!poolItem) continue;
