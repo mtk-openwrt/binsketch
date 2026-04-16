@@ -3,10 +3,9 @@
   Copyright (c) 2026 MediaTek Inc. All rights reserved.
   Author: Sky Huang <SkyLake.Huang@mediatek.com>
 
-  This software is proprietary to MediaTek Inc. and is provided for
-  internal development use only. Unauthorized copying, modification,
-  distribution, or use, via any medium, is strictly prohibited without
-  the prior written permission of MediaTek Inc.
+  This software is proprietary to MediaTek Inc. Unauthorized copying,
+  modification, distribution, or use, via any medium, is strictly
+  prohibited without the prior written permission of MediaTek Inc.
 -->
 <html lang="en">
 <head>
@@ -425,12 +424,30 @@ select:focus, input[type="text"]:focus {
   border: 1px solid var(--border2);
   border-radius: var(--radius-sm);
   box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-  max-height: 240px;
+  /* Tall enough to comfortably scroll the 941-entry NOR list while still
+   * capped so the dropdown doesn't take over the whole viewport. */
+  max-height: 480px;
   overflow-y: auto;
   margin-top: 4px;
 }
 
 .search-dropdown.open { display: block; }
+
+/* Sticky count header inside the dropdown — keeps "Showing X / Y" visible
+ * while the user scrolls through hundreds of models. */
+.search-dropdown .dropdown-header {
+  position: sticky;
+  top: 0;
+  background: var(--surface2);
+  color: var(--ink3);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--border2);
+  z-index: 1;
+}
 
 .search-dropdown .dropdown-item {
   padding: 10px 14px;
@@ -682,6 +699,33 @@ tr.overflow-row > td:first-child {
   color: var(--ink3);
   cursor: pointer;
   user-select: none;
+}
+/* "autoresize" checkbox + label in the sub-partition actions cell.
+ * NOTE: the more-specific `.actions-cell > .ar-toggle` selector below
+ * is what actually wins — `.actions-cell > *` (specificity 0,1,0)
+ * would otherwise force display:inline-block on this element, which
+ * pushes the checkbox to baseline alignment and produces a visible
+ * ~5 px upward offset relative to neighbours like = file and ×. */
+.ar-toggle,
+.actions-cell > .ar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 10px;
+  color: var(--ink3);
+  cursor: pointer;
+  user-select: none;
+  height: 22px;
+}
+.ar-toggle input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--accent);
+  /* Belt-and-braces: even if a future rule strips inline-flex from the
+   * label, vertical-align:middle on the checkbox keeps it centered
+   * relative to the surrounding text. */
+  vertical-align: middle;
 }
 .share-toggle input[type="checkbox"] {
   margin: 0;
@@ -1632,8 +1676,7 @@ td.drag-over {
 
 <footer style="text-align:center; padding:16px 20px 24px; font-size:0.75rem; color:var(--ink3); line-height:1.6; border-top:1px solid var(--border); margin-top:32px;">
   <small>
-    © 2026 MediaTek Inc. All rights reserved.
-    Internal use only — not for distribution.<br>
+    © 2026 MediaTek Inc. All rights reserved.<br>
     Author: Sky Huang &lt;SkyLake.Huang@mediatek.com&gt;
   </small>
 </footer>
@@ -1665,6 +1708,13 @@ td.drag-over {
   // has been assigned. Useful for GPT-based layouts where some partitions
   // are written at production time or after first boot.
   let partitionIncludeMap = {};
+
+  // Which UBI sub-partition is marked as autoresize (volume table flag
+  // UBI_VTBL_AUTORESIZE_FL). Per the UBI on-flash spec only ONE volume
+  // per device may carry this flag. Key format: 'p<parentIdx>:<subIdx>'
+  // Default is the rootfs_data volume — assigned automatically by
+  // renderPartitionTable() when the layout is first rendered.
+  let autoresizeVolumeKey = null;
 
   // Available options cache
   let availableOptions = null;
@@ -2087,7 +2137,12 @@ td.drag-over {
   // ============================================================
   function rebuildLayout() {
     currentLayout = null;
-    partitionImageMap = {};
+    // Do NOT clear partitionImageMap here. Selecting a flash model triggers
+    // rebuildLayout but the partition structure stays the same — only sizes
+    // change — so user-assigned images should survive. Stale entries left
+    // over from a flash-type or platform switch are harmless: the renderer
+    // only iterates the current layout, so unmatched keys stay invisible
+    // and unused.
 
     try {
       if (currentTab === 'quick') {
@@ -2146,9 +2201,30 @@ td.drag-over {
       flashModels = [];
     }
     closeModelDropdown();
-    // Intentionally NOT auto-selecting a model. The Flash Layout
-    // Visualization stays hidden until the user either picks a model
-    // from the dropdown or switches flashInfoMode to 'custom'.
+
+    // Auto-select a sensible default model per flash type so the user
+    // doesn't have to pick one manually before packing. We update the
+    // selectedModel + UI in place; we DO NOT call rebuildLayout from
+    // here because the caller (onQuickSetupChange) is about to do that
+    // anyway with the new selectedModel already set.
+    const defaultByFlash = {
+      'spim-nor':  'MX25L25635F',
+      'spim-nand': 'W25N01GV',
+      'snfi-nand': 'W25N01GV',
+      'emmc':      'Generic_16GB',
+      'sd':        'Generic_16GB',
+    };
+    const defName = defaultByFlash[ft];
+    if (defName) {
+      const m = flashModels.find(x => x.name === defName);
+      if (m) {
+        selectedModel = m;
+        $modelSearch.value = m.name;
+        $infoFlashSize.textContent = typeof m.size === 'number' ? formatSize(m.size) : (m.size || '--');
+        $infoVendor.textContent = m.vendor || '--';
+        updateNandInfo(m);
+      }
+    }
   }
 
   function updateNandInfo(model) {
@@ -2201,7 +2277,18 @@ td.drag-over {
     if (filtered.length === 0) {
       $modelDropdown.innerHTML = '<div class="no-results">No models found</div>';
     } else {
-      filtered.slice(0, 50).forEach(m => {
+      // Header row showing the count — makes truncation impossible to miss
+      // even if the user only sees the first few items above the fold.
+      const header = document.createElement('div');
+      header.className = 'dropdown-header';
+      header.textContent = q
+        ? `Showing ${filtered.length} / ${flashModels.length} models`
+        : `${flashModels.length} models — type to filter`;
+      $modelDropdown.appendChild(header);
+      // Render every match for the current flash type; the dropdown has
+      // overflow-y: auto so the browser scrollbar handles a tall list.
+      // 941 NOR / 151 NAND DOM nodes is well within Chrome's comfort zone.
+      filtered.forEach(m => {
         const div = document.createElement('div');
         div.className = 'dropdown-item';
         const sizeStr = typeof m.size === 'number' ? formatSize(m.size) : (m.size || '');
@@ -2646,14 +2733,46 @@ td.drag-over {
     $tbody.innerHTML = '';
     // Default-include any partition keys that haven't been seen before.
     // Existing user choices are preserved across re-renders.
+    // Special case: rootfs_data UBI volume defaults to UNCHECKED (no
+    // overlay image to pack) — same logic as eMMC/SD u-boot-env etc.
+    // The vtbl entry is still emitted because the layout always carries
+    // rootfs_data as a sub-partition; only the "include in image" flag
+    // is off by default.
     parts.forEach((p, idx) => {
       const key = 'p' + idx;
       if (!(key in partitionIncludeMap)) partitionIncludeMap[key] = true;
-      (p.sub_partitions || []).forEach((_, subIdx) => {
+      (p.sub_partitions || []).forEach((sub, subIdx) => {
         const subKey = 'p' + idx + ':' + subIdx;
-        if (!(subKey in partitionIncludeMap)) partitionIncludeMap[subKey] = true;
+        if (!(subKey in partitionIncludeMap)) {
+          partitionIncludeMap[subKey] = sub.name !== 'rootfs_data';
+        }
       });
     });
+
+    // Validate / auto-pick the autoresize volume.
+    // Layout rebuilds change partition indices; if the previously chosen
+    // key no longer points to a UBI volume in the new layout, reset and
+    // pick rootfs_data as the default. Preserves user intent when valid.
+    let arKeyStillValid = false;
+    if (autoresizeVolumeKey) {
+      const m = autoresizeVolumeKey.match(/^p(\d+):(\d+)$/);
+      if (m) {
+        const sub = parts[+m[1]]?.sub_partitions?.[+m[2]];
+        arKeyStillValid = sub && sub.kind === 'ubi-volume';
+      }
+    }
+    if (!arKeyStillValid) {
+      autoresizeVolumeKey = null;
+      parts.forEach((p, idx) => {
+        (p.sub_partitions || []).forEach((sub, subIdx) => {
+          if (autoresizeVolumeKey === null
+              && sub.kind === 'ubi-volume'
+              && sub.name === 'rootfs_data') {
+            autoresizeVolumeKey = 'p' + idx + ':' + subIdx;
+          }
+        });
+      });
+    }
 
     const validation = validateLayout();
     parts.forEach((p, idx) => {
@@ -3022,11 +3141,20 @@ td.drag-over {
     const subInclCell = '<td class="incl-cell"><input type="checkbox" class="part-include"' +
       subInclChecked + subInclDisabled + ' data-key="' + subInclKey + '" title="Include in packed image"></td>';
 
-    // Sub-partition actions cell: =file + delete
+    // Sub-partition actions cell: =file + autoresize (UBI vols only) + delete
     const subFileBtnHtml = (!isReserved && !sizeReadonly)
       ? '<button class="btn-use-filesize" data-kind="sub" data-parent="' + parentIdx + '" data-idx="' + subIdx + '" title="Set size to filesize">= file</button>'
       : '';
-    const subActionsCell = '<td class="actions-cell">' + subFileBtnHtml + (isReserved ? '' :
+    // Autoresize is meaningful only for UBI volumes — raw sub-parts
+    // (BL2 copies, etc.) don't carry the flag. The vtbl honours the
+    // checked one as the autoresize volume; see UBI_VTBL_AUTORESIZE_FL.
+    const arKey = 'p' + parentIdx + ':' + subIdx;
+    const arHtml = (isUbiVol && !isReserved)
+      ? '<label class="ar-toggle" title="Mark as the UBI autoresize volume — only one per device">' +
+        '<input type="checkbox" class="vol-autoresize" data-key="' + arKey + '"' +
+        (autoresizeVolumeKey === arKey ? ' checked' : '') + '> autoresize</label>'
+      : '';
+    const subActionsCell = '<td class="actions-cell">' + subFileBtnHtml + arHtml + (isReserved ? '' :
       '<button class="btn-delete" data-delete-sub="' + parentIdx + ':' + subIdx + '" title="Remove sub-partition">' +
       '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
       '</button>') + '</td>';
@@ -3357,6 +3485,23 @@ td.drag-over {
     if (checkAll) checkAll.checked = allChecked;
   });
 
+  // ── UBI autoresize (mutual exclusion: at most one volume per device) ──────
+  // When the user checks an .vol-autoresize box on a UBI volume, we record
+  // that key as the singular autoresize volume and uncheck every other
+  // autoresize box. Unchecking it leaves no volume marked autoresize.
+  $tbody.addEventListener('change', e => {
+    const cb = e.target.closest('.vol-autoresize');
+    if (!cb) return;
+    if (cb.checked) {
+      autoresizeVolumeKey = cb.dataset.key;
+      $tbody.querySelectorAll('.vol-autoresize').forEach(other => {
+        if (other !== cb) other.checked = false;
+      });
+    } else {
+      autoresizeVolumeKey = null;
+    }
+  });
+
   // Master "check all" toggle
   document.getElementById('check-all-parts').addEventListener('change', e => {
     const v = e.target.checked;
@@ -3457,11 +3602,46 @@ td.drag-over {
       return;
     }
 
+    // Collect per-partition / per-sub-partition sizes from the current
+    // layout so user-edited sizes (e.g. "= file" button on rootfs) flow
+    // into the packed image. The Rust core's PackInput.partition_sizes
+    // overrides the size from build_layout() before the flash backend
+    // runs, so UBI vtbl reserved_pebs and raw partition bounds checks
+    // both reflect what the user sees in the table.
+    const partitionSizes = {};
+    // partitionAutoresize: explicit per-volume autoresize flag override.
+    // Built from the user's checkbox state (autoresizeVolumeKey) so the
+    // user's choice overrides the builder's default (rootfs_data).
+    // Send false for every UBI volume that is NOT the chosen one — this
+    // also lets the user CLEAR the default rootfs_data autoresize.
+    const partitionAutoresize = {};
+    if (currentLayout && Array.isArray(currentLayout.partitions)) {
+      for (let pi = 0; pi < currentLayout.partitions.length; pi++) {
+        const p = currentLayout.partitions[pi];
+        if (p.size !== undefined && p.size !== null && p.size !== '') {
+          const n = parseHexOrDec(p.size);
+          if (Number.isFinite(n) && n >= 0) partitionSizes[p.name] = n;
+        }
+        const subs = p.sub_partitions || [];
+        for (let si = 0; si < subs.length; si++) {
+          const sub = subs[si];
+          if (sub.size !== undefined && sub.size !== null && sub.size !== '') {
+            const n = parseHexOrDec(sub.size);
+            if (Number.isFinite(n) && n >= 0) partitionSizes[sub.name] = n;
+          }
+          if (sub.kind === 'ubi-volume') {
+            const key = 'p' + pi + ':' + si;
+            partitionAutoresize[sub.name] = (autoresizeVolumeKey === key);
+          }
+        }
+      }
+    }
+
     showToast('Packing image...', '');
     try {
       const platform = currentTab === 'quick' ? $platform.value : 'mt7981';
       const optionsJson = buildOptionsJson();
-      const result = wasm.pack(platform, flash, optionsJson, images);
+      const result = wasm.pack(platform, flash, optionsJson, images, partitionSizes, partitionAutoresize);
       if (!result || result.length === 0) {
         showToast('Pack returned empty result.', 'error');
         return;

@@ -585,9 +585,11 @@ export function get_supported_flash_types(platform) {
  * @param {string} flash_type
  * @param {string} options_json
  * @param {any} images
+ * @param {any} partition_sizes
+ * @param {any} partition_autoresize
  * @returns {Uint8Array}
  */
-export function pack(platform, flash_type, options_json, images) {
+export function pack(platform, flash_type, options_json, images, partition_sizes, partition_autoresize) {
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
         const ptr0 = passStringToWasm0(platform, wasm.__wbindgen_export, wasm.__wbindgen_export2);
@@ -596,7 +598,7 @@ export function pack(platform, flash_type, options_json, images) {
         const len1 = WASM_VECTOR_LEN;
         const ptr2 = passStringToWasm0(options_json, wasm.__wbindgen_export, wasm.__wbindgen_export2);
         const len2 = WASM_VECTOR_LEN;
-        wasm.pack(retptr, ptr0, len0, ptr1, len1, ptr2, len2, addHeapObject(images));
+        wasm.pack(retptr, ptr0, len0, ptr1, len1, ptr2, len2, addHeapObject(images), addHeapObject(partition_sizes), addHeapObject(partition_autoresize));
         var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
         var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
         var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
@@ -725,6 +727,11 @@ export function version() {
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,
+        __wbg___wbindgen_boolean_get_c0f3f60bac5a78d1: function(arg0) {
+            const v = getObject(arg0);
+            const ret = typeof(v) === 'boolean' ? v : undefined;
+            return isLikeNone(ret) ? 0xFFFFFF : ret ? 1 : 0;
+        },
         __wbg___wbindgen_is_null_0b605fc6b167c56f: function(arg0) {
             const ret = getObject(arg0) === null;
             return ret;
@@ -732,6 +739,12 @@ function __wbg_get_imports() {
         __wbg___wbindgen_is_undefined_52709e72fb9f179c: function(arg0) {
             const ret = getObject(arg0) === undefined;
             return ret;
+        },
+        __wbg___wbindgen_number_get_34bb9d9dcfa21373: function(arg0, arg1) {
+            const obj = getObject(arg1);
+            const ret = typeof(obj) === 'number' ? obj : undefined;
+            getDataViewMemory0().setFloat64(arg0 + 8 * 1, isLikeNone(ret) ? 0 : ret, true);
+            getDataViewMemory0().setInt32(arg0 + 4 * 0, !isLikeNone(ret), true);
         },
         __wbg___wbindgen_string_get_395e606bd0ee4427: function(arg0, arg1) {
             const obj = getObject(arg1);
