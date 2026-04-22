@@ -1636,9 +1636,18 @@ td.drag-over {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="3"/></svg>
         </div>
         <h2>Flash Layout Visualization</h2>
+        <div class="viz-zoom-controls" style="margin-left:auto; display:flex; align-items:center; gap:6px;">
+          <button type="button" class="btn btn-ghost btn-icon" id="viz-zoom-out" title="Zoom out (fewer rows)" aria-label="Zoom out">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+          </button>
+          <span id="viz-zoom-label" style="font-size:11px; color:var(--ink3); font-variant-numeric:tabular-nums; min-width:38px; text-align:center;">1 row</span>
+          <button type="button" class="btn btn-ghost btn-icon" id="viz-zoom-in" title="Zoom in (more rows)" aria-label="Zoom in">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+          </button>
+        </div>
       </div>
       <div class="layout-bar-container">
-        <div class="layout-bar" id="layout-bar"></div>
+        <div id="layout-bars"></div>
         <div class="layout-legend" id="layout-legend"></div>
         <div class="utilization-bar" id="utilization-bar" style="display:none;">
           <span class="utilization-text" id="util-label">Utilization</span>
@@ -1746,7 +1755,7 @@ td.drag-over {
   const $infoFlashSize = $('info-flash-size');
   const $infoVendor = $('info-vendor');
   const $tbody = $('partition-tbody');
-  const $layoutBar = $('layout-bar');
+  const $layoutBars = $('layout-bars');
   const $layoutLegend = $('layout-legend');
   const $utilBar = $('utilization-bar');
   const $utilFill = $('util-fill');
@@ -2211,8 +2220,8 @@ td.drag-over {
       'spim-nor':  'MX25L25635F',
       'spim-nand': 'W25N01GV',
       'snfi-nand': 'W25N01GV',
-      'emmc':      'Generic_16GB',
-      'sd':        'Generic_16GB',
+      'emmc':      'General_8GB',
+      'sd':        'General_8GB',
     };
     const defName = defaultByFlash[ft];
     if (defName) {
@@ -2305,7 +2314,11 @@ td.drag-over {
     $modelDropdown.classList.remove('open');
   }
 
-  $modelSearch.addEventListener('focus', () => renderModelDropdown($modelSearch.value));
+  // On focus, always render the full list — the search input shows the
+  // currently-selected model's name (e.g. "General_8GB"), and filtering
+  // by that name would hide every other option, which is the opposite
+  // of what the user wants when they click the search box.
+  $modelSearch.addEventListener('focus', () => renderModelDropdown(''));
   $modelSearch.addEventListener('input', () => renderModelDropdown($modelSearch.value));
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.search-select-wrapper')) closeModelDropdown();
@@ -2899,7 +2912,12 @@ td.drag-over {
     // ── Actions tail cell (type-select + =file + add-sub/volume + delete) ──
     // All per-row action controls live here so Name/Offset/Size columns have
     // enough horizontal space to show their content.
-    const typeSelectHtml = isReserved
+    // Only NAND flash can carry UBI containers. NOR / eMMC / SD don't
+    // use UBI at all, so hide the normal/UBI dropdown for them — the
+    // partition type is implicitly "normal" and users can't toggle it.
+    const ft_for_type = getActiveFlashType();
+    const supportsUbi = ft_for_type === 'spim-nand' || ft_for_type === 'snfi-nand';
+    const typeSelectHtml = (isReserved || !supportsUbi)
       ? ''
       : '<select class="type-select" data-type-idx="' + idx + '" title="Partition type">' +
         '<option value="normal"' + (pType === 'normal' ? ' selected' : '') + '>normal</option>' +
@@ -3386,12 +3404,22 @@ td.drag-over {
     return false;
   }
 
+  // Zoom state: how many rows the visualization bar is split into.
+  // 1 = single bar spanning the full flash; N = N stacked bars, each
+  // covering 1/N of the flash. Higher zoom lets users see small
+  // partitions that would otherwise be invisible on a single-bar view.
+  let vizRowCount = 1;
+  const VIZ_MAX_ROWS = 8;
+
   function renderLayoutVisualization() {
     const card = $('layout-viz-card');
     if (card) card.style.display = isLayoutVizReady() ? '' : 'none';
 
-    $layoutBar.innerHTML = '';
+    $layoutBars.innerHTML = '';
     $layoutLegend.innerHTML = '';
+    const zoomLabel = $('viz-zoom-label');
+    if (zoomLabel) zoomLabel.textContent = vizRowCount + (vizRowCount === 1 ? ' row' : ' rows');
+
     if (!isLayoutVizReady()) {
       $utilBar.style.display = 'none';
       return;
@@ -3401,41 +3429,113 @@ td.drag-over {
       return;
     }
     const parts = currentLayout.partitions;
-    let maxEnd = 0;
-    const parsed = parts.map((p, i) => {
-      const start = parseHexOrDec(p.start);
-      const size = parseHexOrDec(p.size);
-      const end = start + size;
-      if (end > maxEnd) maxEnd = end;
-      return {
-        name: p.name,
-        start, size, end,
-        reserved: p.reserved === true,
-        color: PARTITION_COLORS[i % PARTITION_COLORS.length],
-      };
-    });
+    // First pass: parse offsets/sizes as-is (some may be NaN because
+    // the size is unset, e.g. rootfs/firmware that extends to the end).
+    const raw = parts.map((p, i) => ({
+      name: p.name,
+      start: parseHexOrDec(p.start),
+      size: parseHexOrDec(p.size),
+      reserved: p.reserved === true,
+      color: PARTITION_COLORS[i % PARTITION_COLORS.length],
+    }));
 
+    // Resolve total flash capacity: prefer the selected model (so "7%
+    // usage" actually looks like 7%), fall back to the custom capacity
+    // input, then to the last known partition end as a last resort.
+    let totalFlash = 0;
+    if (selectedModel && typeof selectedModel.size === 'number' && selectedModel.size > 0) {
+      totalFlash = selectedModel.size;
+    } else {
+      const cap = getFlashCapacity();
+      if (cap > 0) totalFlash = cap;
+    }
+    if (totalFlash === 0) {
+      for (const p of raw) {
+        if (Number.isFinite(p.start) && Number.isFinite(p.size)) {
+          totalFlash = Math.max(totalFlash, p.start + p.size);
+        }
+      }
+    }
+    if (!Number.isFinite(totalFlash) || totalFlash <= 0) {
+      $utilBar.style.display = 'none';
+      return;
+    }
+
+    // Second pass: fill in missing sizes — an unsized partition extends
+    // to whichever is closer: the next declared partition start, or the
+    // end of flash.
+    const parsed = raw.map((p, idx) => {
+      let size = p.size;
+      let start = Number.isFinite(p.start) ? p.start : 0;
+      if (!Number.isFinite(size)) {
+        let nextStart = totalFlash;
+        for (let j = 0; j < raw.length; j++) {
+          if (j === idx) continue;
+          const q = raw[j];
+          if (Number.isFinite(q.start) && q.start > start && q.start < nextStart) {
+            nextStart = q.start;
+          }
+        }
+        size = Math.max(0, nextStart - start);
+      }
+      return { ...p, start, size, end: start + size };
+    });
+    const maxEnd = parsed.reduce((m, p) => Math.max(m, p.end), 0);
     if (maxEnd === 0) { $utilBar.style.display = 'none'; return; }
+    if (totalFlash < maxEnd) totalFlash = maxEnd;
 
-    parsed.forEach(p => {
-      const pct = (p.size / maxEnd) * 100;
-      if (pct < 0.1) return;
-      const seg = document.createElement('div');
-      seg.className = p.reserved ? 'layout-segment reserved' : 'layout-segment';
-      seg.style.width = Math.max(pct, 0.5) + '%';
-      if (p.reserved) {
-        seg.style.background =
-          'repeating-linear-gradient(135deg,' + p.color + ' 0 6px, rgba(255,255,255,0.5) 6px 12px)';
-      } else {
-        seg.style.background = p.color;
-      }
-      const tipSuffix = p.reserved ? ' [reserved — auto-generated]' : '';
-      seg.setAttribute('data-tooltip', p.name + ' @ ' + formatHex(p.start) + ' (' + formatSize(p.size) + ')' + tipSuffix);
-      if (pct > 5) {
-        seg.innerHTML = '<span class="seg-label">' + escapeHtml(p.name) + '</span>';
-      }
-      $layoutBar.appendChild(seg);
-    });
+    // Split the flash into `vizRowCount` equal-width rows. A partition
+    // that spans multiple rows is drawn as one segment per row; each
+    // segment carries the fraction of the partition that overlaps its
+    // row, so a 7% partition is ~7% wide at zoom=1 and roughly 7*N%
+    // wide at zoom=N (once it falls entirely within one row).
+    const rows = [];
+    for (let r = 0; r < vizRowCount; r++) {
+      const rowStart = (totalFlash * r) / vizRowCount;
+      const rowEnd = (totalFlash * (r + 1)) / vizRowCount;
+      const rowSize = rowEnd - rowStart;
+      const row = document.createElement('div');
+      row.className = 'layout-bar';
+      if (r < vizRowCount - 1) row.style.marginBottom = '4px';
+
+      let filled = 0;
+      parsed.forEach(p => {
+        const segStart = Math.max(p.start, rowStart);
+        const segEnd = Math.min(p.end, rowEnd);
+        if (segEnd <= segStart) return;
+
+        // Leading gap inside this row (unallocated space).
+        const gap = segStart - rowStart - filled;
+        if (gap > 0) {
+          const g = document.createElement('div');
+          g.className = 'layout-segment';
+          g.style.width = ((gap / rowSize) * 100) + '%';
+          g.style.background = 'transparent';
+          row.appendChild(g);
+        }
+
+        const widthPct = ((segEnd - segStart) / rowSize) * 100;
+        const seg = document.createElement('div');
+        seg.className = p.reserved ? 'layout-segment reserved' : 'layout-segment';
+        seg.style.width = widthPct + '%';
+        if (p.reserved) {
+          seg.style.background =
+            'repeating-linear-gradient(135deg,' + p.color + ' 0 6px, rgba(255,255,255,0.5) 6px 12px)';
+        } else {
+          seg.style.background = p.color;
+        }
+        const tipSuffix = p.reserved ? ' [reserved — auto-generated]' : '';
+        seg.setAttribute('data-tooltip', p.name + ' @ ' + formatHex(p.start) + ' (' + formatSize(p.size) + ')' + tipSuffix);
+        if (widthPct > 5) {
+          seg.innerHTML = '<span class="seg-label">' + escapeHtml(p.name) + '</span>';
+        }
+        row.appendChild(seg);
+        filled = segEnd - rowStart;
+      });
+
+      rows.push(row);
+      $layoutBars.appendChild(row);
+    }
 
     parsed.forEach(p => {
       const item = document.createElement('div');
@@ -3448,14 +3548,26 @@ td.drag-over {
 
     // Utilization
     const totalUsed = parsed.reduce((s, p) => s + p.size, 0);
-    let totalFlash = maxEnd;
-    if (selectedModel && typeof selectedModel.size === 'number' && selectedModel.size > 0) {
-      totalFlash = selectedModel.size;
-    }
     const pct = Math.min(100, (totalUsed / totalFlash) * 100);
     $utilFill.style.width = pct.toFixed(1) + '%';
     $utilPct.textContent = pct.toFixed(1) + '%';
     $utilBar.style.display = 'flex';
+  }
+
+  // Zoom controls: +/– change vizRowCount and re-render. Clamped to
+  // [1, VIZ_MAX_ROWS] — beyond 8 rows the segments become too short
+  // to be useful.
+  const $vizZoomIn = $('viz-zoom-in');
+  const $vizZoomOut = $('viz-zoom-out');
+  if ($vizZoomIn) {
+    $vizZoomIn.addEventListener('click', () => {
+      if (vizRowCount < VIZ_MAX_ROWS) { vizRowCount += 1; renderLayoutVisualization(); }
+    });
+  }
+  if ($vizZoomOut) {
+    $vizZoomOut.addEventListener('click', () => {
+      if (vizRowCount > 1) { vizRowCount -= 1; renderLayoutVisualization(); }
+    });
   }
 
   // ============================================================
@@ -3637,11 +3749,19 @@ td.drag-over {
       }
     }
 
+    // layout_json: the exact post-edit partition table. Covers every
+    // structural change the user made in the table (delete / rename /
+    // reorder / add) in one payload, so the Rust core skips the
+    // options-driven builder and trusts the shipped layout.
+    const layoutJson = (currentLayout && Array.isArray(currentLayout.partitions))
+      ? JSON.stringify(currentLayout)
+      : null;
+
     showToast('Packing image...', '');
     try {
       const platform = currentTab === 'quick' ? $platform.value : 'mt7981';
       const optionsJson = buildOptionsJson();
-      const result = wasm.pack(platform, flash, optionsJson, images, partitionSizes, partitionAutoresize);
+      const result = wasm.pack(platform, flash, optionsJson, images, partitionSizes, partitionAutoresize, layoutJson);
       if (!result || result.length === 0) {
         showToast('Pack returned empty result.', 'error');
         return;

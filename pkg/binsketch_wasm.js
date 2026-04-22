@@ -587,9 +587,10 @@ export function get_supported_flash_types(platform) {
  * @param {any} images
  * @param {any} partition_sizes
  * @param {any} partition_autoresize
+ * @param {any} layout_json
  * @returns {Uint8Array}
  */
-export function pack(platform, flash_type, options_json, images, partition_sizes, partition_autoresize) {
+export function pack(platform, flash_type, options_json, images, partition_sizes, partition_autoresize, layout_json) {
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
         const ptr0 = passStringToWasm0(platform, wasm.__wbindgen_export, wasm.__wbindgen_export2);
@@ -598,7 +599,7 @@ export function pack(platform, flash_type, options_json, images, partition_sizes
         const len1 = WASM_VECTOR_LEN;
         const ptr2 = passStringToWasm0(options_json, wasm.__wbindgen_export, wasm.__wbindgen_export2);
         const len2 = WASM_VECTOR_LEN;
-        wasm.pack(retptr, ptr0, len0, ptr1, len1, ptr2, len2, addHeapObject(images), addHeapObject(partition_sizes), addHeapObject(partition_autoresize));
+        wasm.pack(retptr, ptr0, len0, ptr1, len1, ptr2, len2, addHeapObject(images), addHeapObject(partition_sizes), addHeapObject(partition_autoresize), addHeapObject(layout_json));
         var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
         var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
         var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
