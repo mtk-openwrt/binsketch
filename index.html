@@ -128,29 +128,6 @@ header .version-badge {
 #wasm-error.visible { display: flex; }
 #wasm-error svg { flex-shrink: 0; }
 
-/* Loading */
-#loading-overlay {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80px 20px;
-  gap: 16px;
-  color: var(--ink2);
-  font-size: 15px;
-}
-
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--border2);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
-
 /* Cards */
 .card {
   background: var(--surface);
@@ -1416,20 +1393,14 @@ td.drag-over {
 </header>
 
 <div class="container">
-  <!-- WASM error banner -->
+  <!-- Init error banner -->
   <div id="wasm-error">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-    <span id="wasm-error-msg">Failed to load WASM module. This tool requires WebAssembly support.</span>
+    <span id="wasm-error-msg">Failed to initialize. Please reload the page.</span>
   </div>
 
-  <!-- Loading state -->
-  <div id="loading-overlay">
-    <div class="spinner"></div>
-    <span>Loading WASM module...</span>
-  </div>
-
-  <!-- Main content (hidden until WASM loads) -->
-  <div id="main-content" style="display:none;">
+  <!-- Main content -->
+  <div id="main-content">
 
     <!-- 1. Configuration Card with Tabs -->
     <div class="card">
@@ -1738,10 +1709,8 @@ td.drag-over {
   // DOM refs
   // ============================================================
   const $ = id => document.getElementById(id);
-  const $loading = $('loading-overlay');
   const $wasmError = $('wasm-error');
   const $wasmErrorMsg = $('wasm-error-msg');
-  const $main = $('main-content');
   const $version = $('version-badge');
   const $platform = $('sel-platform');
   const $flash = $('sel-flash');
@@ -1787,21 +1756,18 @@ td.drag-over {
   }
 
   // ============================================================
-  // WASM Load
+  // Module init
   // ============================================================
   try {
     const base = new URL('.', import.meta.url).href;
     wasm = await import(base + 'pkg/binsketch_wasm.js');
     await wasm.default();
   } catch (err) {
-    $loading.style.display = 'none';
     $wasmError.classList.add('visible');
-    $wasmErrorMsg.textContent = 'Failed to load WASM module: ' + (err.message || err);
+    $wasmErrorMsg.textContent = 'Failed to initialize. Please reload the page.';
+    console.error(err);
     return;
   }
-
-  $loading.style.display = 'none';
-  $main.style.display = 'block';
 
   // ============================================================
   // Utility helpers
@@ -3706,12 +3672,36 @@ td.drag-over {
       }
     }
 
-    // BL2 is always required for NAND/NOR/SD flash images.
     const flash = getActiveFlashType();
-    const needsBl2 = flash !== 'emmc';
-    if (needsBl2 && !images.bl2) {
-      showToast('BL2 image is required. Assign it in the partition table.', 'error');
-      return;
+
+    // For eMMC/SD, auto-generate the primary GPT header from the current
+    // partition layout and inject it as images['gpt'] so the front 0x4400
+    // bytes of the packed image carry a valid GPT (matching what the
+    // standalone "Download Primary GPT" button produces). User-provided
+    // GPT image (if any) takes precedence — we only fill in when missing.
+    if (isEmmcSd(flash) && !images.gpt && currentLayout && Array.isArray(currentLayout.partitions)) {
+      const diskSize = getFlashCapacity();
+      if (!diskSize || diskSize <= 0) {
+        showToast('Select a flash model or set a custom capacity so the GPT can be generated.', 'error');
+        return;
+      }
+      const gptParts = currentLayout.partitions
+        .filter(p => p && p.name && p.name.toLowerCase() !== 'gpt')
+        .map(p => ({
+          name: p.name,
+          offset: parseHexOrDec(p.start),
+          size: parseHexOrDec(p.size),
+        }));
+      try {
+        const gptBytes = wasm.generate_primary_gpt(JSON.stringify(gptParts), diskSize);
+        if (gptBytes && gptBytes.length > 0) {
+          images.gpt = gptBytes;
+        }
+      } catch (e) {
+        console.error('primary GPT generation failed:', e);
+        showToast('Primary GPT generation failed: ' + (e.message || e), 'error');
+        return;
+      }
     }
 
     // Collect per-partition / per-sub-partition sizes from the current
