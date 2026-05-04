@@ -1231,15 +1231,13 @@ td.drag-over {
   padding: 8px 10px;
 }
 
-/* GPT buttons row */
-.gpt-buttons {
+/* GPT-only action buttons (eMMC/SD only). Live in .actions-row alongside
+   the always-visible buttons; toggled per-flash-type by JS. */
+.actions-row .gpt-only {
   display: none;
-  gap: 10px;
-  margin-top: 10px;
 }
-
-.gpt-buttons.visible {
-  display: flex;
+.actions-row .gpt-only.visible {
+  display: inline-flex;
 }
 
 /* Modal / dump overlay */
@@ -1587,14 +1585,12 @@ td.drag-over {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
           Dump Layout
         </button>
-      </div>
-      <div class="gpt-buttons" id="gpt-buttons">
-        <button class="btn btn-secondary btn-sm" id="btn-download-primary-gpt">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <button class="btn btn-secondary gpt-only" id="btn-download-primary-gpt">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Download Primary GPT
         </button>
-        <button class="btn btn-secondary btn-sm" id="btn-download-secondary-gpt">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <button class="btn btn-secondary gpt-only" id="btn-download-secondary-gpt">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Download Secondary GPT
         </button>
       </div>
@@ -1732,7 +1728,7 @@ td.drag-over {
   const $toast = $('toast');
   const $dumpModal = $('dump-modal');
   const $dumpContent = $('dump-content');
-  const $gptButtons = $('gpt-buttons');
+  const $gptButtons = document.querySelectorAll('.actions-row .gpt-only');
   const $btnFlashFromModel = $('btn-flash-from-model');
   const $btnFlashCustom = $('btn-flash-custom');
   const $flashModelSection = $('flash-model-section');
@@ -1748,11 +1744,12 @@ td.drag-over {
   // Toast
   // ============================================================
   let toastTimer = null;
-  function showToast(msg, type) {
+  function showToast(msg, type, timeoutMs) {
     clearTimeout(toastTimer);
     $toast.textContent = msg;
     $toast.className = 'toast ' + (type || '') + ' visible';
-    toastTimer = setTimeout(() => { $toast.classList.remove('visible'); }, 3500);
+    toastTimer = setTimeout(() => { $toast.classList.remove('visible'); },
+      typeof timeoutMs === 'number' ? timeoutMs : 3500);
   }
 
   // ============================================================
@@ -3351,8 +3348,8 @@ td.drag-over {
   // GPT buttons visibility
   // ============================================================
   function updateGptButtons() {
-    const ft = getActiveFlashType();
-    $gptButtons.classList.toggle('visible', isEmmcSd(ft));
+    const visible = isEmmcSd(getActiveFlashType());
+    $gptButtons.forEach(btn => btn.classList.toggle('visible', visible));
   }
 
   // ============================================================
@@ -3768,32 +3765,203 @@ td.drag-over {
   // ============================================================
   // Action: Download YAML
   // ============================================================
+  //
+  // YAML schema (binsketch_version: 1):
+  //
+  //   binsketch_version: 1
+  //   configuration:
+  //     tab: quick | custom
+  //     platform: <id>           # only meaningful for tab=quick
+  //     flash_type: <id>
+  //     os_distribution: <id>    # only meaningful for tab=quick
+  //   layout_options:            # only meaningful for tab=quick
+  //     nand_mode: nmbm-ubi | full-ubi
+  //     dual_kernel/rootfs/fip/firmware: bool
+  //   flash_info:
+  //     source: model | custom
+  //     vendor: <name>           # source=model
+  //     model: <name>            # source=model
+  //     size: <bytes>
+  //     page_size / block_size / oob_size: <bytes>   # NAND only
+  //     capacity: <bytes>        # source=custom
+  //   images:                    # metadata only (no binary blobs)
+  //     - filename: bl2.img
+  //       size: <bytes>
+  //       partition: bl2         # optional — name of the partition or
+  //                              # UBI volume the file is bound to
+  //   pad_byte: "0xFF" | "0x00"
+  //   partitions:
+  //     - name: gpt
+  //       start: "0x0"
+  //       size: "0x4400"
+  //       reserved: true         # auto-generated; UI re-locks the row
+  //     - name: ubi
+  //       start: "0x100000"
+  //       size: "0x4000000"
+  //       sub_partitions:
+  //         - name: kernel
+  //           start: "0x100000"
+  //           size: "0x400000"
+  //           kind: ubi-volume
+  //           vol_id: 0
+  //           vol_type: 1
+  //           autoresize: false
+  //
+  // Image bytes are NOT serialized — too large for YAML, and re-attach
+  // is the natural workflow. The loader records expected filenames
+  // and surfaces them so the user knows what to drag back in.
+  // ============================================================
   $('btn-download-yaml').addEventListener('click', () => {
     if (!currentLayout || !currentLayout.partitions) {
       showToast('No layout to export.', 'error');
       return;
     }
     const ft = getActiveFlashType();
-    let yaml = '# BinSketch - Partition Layout\n';
-    yaml += '# Flash Type: ' + ft + '\n\n';
+    const lines = [];
+    lines.push('# BinSketch - Partition Layout');
+    lines.push('# Flash Type: ' + ft);
+    lines.push('binsketch_version: 1');
+    lines.push('');
+    // Configuration
+    lines.push('configuration:');
+    lines.push('  tab: ' + currentTab);
     if (currentTab === 'quick') {
-      yaml += 'platform: ' + $platform.value + '\n';
+      lines.push('  platform: ' + $platform.value);
     }
-    yaml += 'flash_type: ' + ft + '\n';
-    yaml += 'pad_byte: "' + (currentLayout.pad_byte || '0xFF') + '"\n\n';
-    yaml += 'partitions:\n';
+    lines.push('  flash_type: ' + ft);
+    if (currentTab === 'quick' && $osDist && $osDist.value) {
+      lines.push('  os_distribution: ' + $osDist.value);
+    }
+    // Layout options (only for quick tab; the dynamic checkboxes only
+    // exist there)
+    if (currentTab === 'quick' && availableOptions) {
+      const optLines = [];
+      if (availableOptions.has_nand_mode) {
+        const checked = document.querySelector('input[name="nand_mode"]:checked');
+        if (checked) optLines.push('  nand_mode: ' + checked.value);
+      }
+      const cbMap = [
+        ['has_dual_kernel',   'opt-dual-kernel',   'dual_kernel'],
+        ['has_dual_rootfs',   'opt-dual-rootfs',   'dual_rootfs'],
+        ['has_dual_fip',      'opt-dual-fip',      'dual_fip'],
+        ['has_dual_firmware', 'opt-dual-firmware', 'dual_firmware'],
+      ];
+      cbMap.forEach(([flag, id, key]) => {
+        if (availableOptions[flag]) {
+          const cb = $(id);
+          if (cb) optLines.push('  ' + key + ': ' + (cb.checked ? 'true' : 'false'));
+        }
+      });
+      if (optLines.length > 0) {
+        lines.push('layout_options:');
+        optLines.forEach(l => lines.push(l));
+      }
+    }
+    // Flash info
+    lines.push('flash_info:');
+    lines.push('  source: ' + flashInfoMode);
+    if (flashInfoMode === 'model' && selectedModel) {
+      if (selectedModel.vendor) lines.push('  vendor: ' + yamlScalar(selectedModel.vendor));
+      if (selectedModel.name)   lines.push('  model: '  + yamlScalar(selectedModel.name));
+      if (typeof selectedModel.size === 'number')
+        lines.push('  size: ' + selectedModel.size);
+      const page  = selectedModel.pageSize  ?? selectedModel.page_size;
+      const block = selectedModel.blockSize ?? selectedModel.block_size;
+      const oob   = selectedModel.oobSize   ?? selectedModel.oob_size;
+      if (typeof page  === 'number') lines.push('  page_size: '  + page);
+      if (typeof block === 'number') lines.push('  block_size: ' + block);
+      if (typeof oob   === 'number') lines.push('  oob_size: '   + oob);
+    } else if (flashInfoMode === 'custom') {
+      const cap = parseInt($customCapacity.value, 10);
+      if (!isNaN(cap)) lines.push('  capacity: ' + cap);
+      if (isNandType(ft)) {
+        const page  = parseInt($('custom-page-size')?.value,  10);
+        const block = parseInt($('custom-block-size')?.value, 10);
+        const oob   = parseInt($('custom-oob-size')?.value,   10);
+        if (!isNaN(page))  lines.push('  page_size: '  + page);
+        if (!isNaN(block)) lines.push('  block_size: ' + block);
+        if (!isNaN(oob))   lines.push('  oob_size: '   + oob);
+      }
+    }
+    // Image pool — metadata only. Each pool entry is emitted with its
+    // assigned partition (top-level or sub-partition by name) when one
+    // exists. After Load, the user re-attaches the actual files.
+    if (imagePool.length > 0) {
+      lines.push('images:');
+      imagePool.forEach(item => {
+        lines.push('  - filename: ' + yamlScalar(item.name));
+        lines.push('    size: ' + (typeof item.size === 'number' ? item.size : 0));
+        const partName = partitionNameForPoolId(item.id);
+        if (partName) lines.push('    partition: ' + yamlScalar(partName));
+      });
+    }
+    lines.push('pad_byte: "' + (currentLayout.pad_byte || getDefaultPad(ft)) + '"');
+    // Partitions
+    lines.push('partitions:');
     currentLayout.partitions.forEach(p => {
-      yaml += '  - name: ' + p.name + '\n';
-      yaml += '    start: "' + formatHex(p.start) + '"\n';
-      yaml += '    size: "' + formatHex(p.size) + '"\n';
-      if (p.pad) yaml += '    pad: "' + p.pad + '"\n';
-      yaml += '\n';
+      const partLines = [];
+      partLines.push('  - name: ' + yamlScalar(p.name));
+      if (p.start !== undefined && p.start !== null)
+        partLines.push('    start: "' + formatHex(p.start) + '"');
+      if (p.size !== undefined && p.size !== null)
+        partLines.push('    size: "' + formatHex(p.size) + '"');
+      if (p.reserved === true) partLines.push('    reserved: true');
+      if (p.pad)               partLines.push('    pad: "' + p.pad + '"');
+      if (Array.isArray(p.sub_partitions) && p.sub_partitions.length > 0) {
+        partLines.push('    sub_partitions:');
+        p.sub_partitions.forEach(s => {
+          partLines.push('      - name: ' + yamlScalar(s.name));
+          if (s.start !== undefined && s.start !== null)
+            partLines.push('        start: "' + formatHex(s.start) + '"');
+          if (s.size !== undefined && s.size !== null)
+            partLines.push('        size: "' + formatHex(s.size) + '"');
+          if (s.kind) partLines.push('        kind: ' + yamlScalar(s.kind));
+          if (s.vol_id !== undefined && s.vol_id !== null)
+            partLines.push('        vol_id: ' + s.vol_id);
+          if (s.vol_type !== undefined && s.vol_type !== null)
+            partLines.push('        vol_type: ' + s.vol_type);
+          if (s.autoresize === true) partLines.push('        autoresize: true');
+          if (s.reserved   === true) partLines.push('        reserved: true');
+        });
+      }
+      partLines.forEach(l => lines.push(l));
     });
+    const yaml = lines.join('\n') + '\n';
 
     const platform = currentTab === 'quick' ? $platform.value : 'custom';
     downloadBlob(new TextEncoder().encode(yaml), platform + '_' + ft + '.yaml');
     showToast('YAML downloaded.', 'success');
   });
+
+  // Quote a string for YAML output if it contains characters that would
+  // confuse the parser (whitespace, special chars). Numbers and bare
+  // identifiers go through unquoted.
+  function yamlScalar(v) {
+    if (v === null || v === undefined) return '""';
+    const s = String(v);
+    if (s === '') return '""';
+    if (/^[A-Za-z0-9_./-]+$/.test(s)) return s;
+    return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+  }
+
+  // Look up the partition or sub-partition name a pool item is assigned
+  // to via partitionImageMap. Returns null when not assigned.
+  function partitionNameForPoolId(poolId) {
+    if (!currentLayout || !currentLayout.partitions) return null;
+    for (const key of Object.keys(partitionImageMap)) {
+      if (partitionImageMap[key] !== poolId) continue;
+      const m = key.match(/^p(\d+)(?::(\d+))?$/);
+      if (!m) continue;
+      const pi = parseInt(m[1], 10);
+      const si = m[2] !== undefined ? parseInt(m[2], 10) : null;
+      const part = currentLayout.partitions[pi];
+      if (!part) continue;
+      if (si === null) return part.name;
+      const sub = (part.sub_partitions || [])[si];
+      if (sub) return sub.name;
+    }
+    return null;
+  }
 
   // ============================================================
   // Action: Load YAML
@@ -3808,89 +3976,268 @@ td.drag-over {
     try {
       const text = await file.text();
       const parsed = parseSimpleYaml(text);
-
-      if (parsed.platform) {
-        const opt = Array.from($platform.options).find(o => o.value === parsed.platform);
-        if (opt) $platform.value = parsed.platform;
-      }
-      if (parsed.flash_type) {
-        refreshFlashTypes();
-        const opt = Array.from($flash.options).find(o => o.value === parsed.flash_type);
-        if (opt) $flash.value = parsed.flash_type;
-      }
-
-      loadFlashModels();
-      updateGptButtons();
-
-      if (parsed.partitions && parsed.partitions.length > 0) {
-        currentLayout = {
-          partitions: parsed.partitions.map(p => ({
-            name: p.name || 'unnamed',
-            start: p.start || '0x0',
-            size: p.size || '0x0',
-            pad: p.pad || parsed.pad_byte || getDefaultPad(getActiveFlashType())
-          })),
-          pad_byte: parsed.pad_byte || getDefaultPad(getActiveFlashType())
-        };
-        partitionImageMap = {};
-        renderPartitionTable();
-        renderLayoutVisualization();
-        showToast('YAML loaded: ' + parsed.partitions.length + ' partitions.', 'success');
-      } else {
-        showToast('No partitions found in YAML.', 'error');
-      }
+      applyParsedYaml(parsed);
     } catch (err) {
       showToast('Failed to parse YAML: ' + (err.message || err), 'error');
     }
     $yamlFileInput.value = '';
   });
 
-  function parseSimpleYaml(text) {
-    const result = { partitions: [] };
-    const lines = text.split('\n');
-    let currentPartition = null;
-    let inPartitions = false;
+  // Apply a parsed YAML document to the UI in dependency order:
+  // tab → flash type → platform / OS dist → flash info → layout options
+  // → currentLayout (preserving reserved flags so GPT stays locked) →
+  // image-pool metadata (as expected-file placeholders).
+  function applyParsedYaml(parsed) {
+    if (!parsed || typeof parsed !== 'object') {
+      showToast('Empty or unparseable YAML.', 'error');
+      return;
+    }
+    const cfg = parsed.configuration || {};
+    // Back-compat: older YAMLs (binsketch_version absent) put flash_type
+    // and platform at the top level.
+    const tab = cfg.tab || (parsed.platform ? 'quick' : currentTab);
+    const platform = cfg.platform || parsed.platform;
+    const flashType = cfg.flash_type || parsed.flash_type;
+    const osDist = cfg.os_distribution || parsed.os_distribution;
 
-    for (const rawLine of lines) {
-      const line = rawLine.replace(/\r$/, '');
-      if (/^\s*#/.test(line) || /^\s*$/.test(line)) continue;
+    // 1. Set tab. setTab() rebuilds layout, but we'll override
+    //    currentLayout at the end so the rebuild output is harmless.
+    if (tab && tab !== currentTab) {
+      currentTab = tab;
+      $configTabs.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      $('tab-quick').style.display  = tab === 'quick'  ? '' : 'none';
+      $('tab-custom').style.display = tab === 'custom' ? '' : 'none';
+    }
 
-      const topMatch = line.match(/^(\w[\w_]*):\s*(.+)?$/);
-      if (topMatch && !inPartitions) {
-        const key = topMatch[1];
-        let val = (topMatch[2] || '').replace(/^["']|["']$/g, '').trim();
-        if (key === 'platform') result.platform = val;
-        else if (key === 'flash_type') result.flash_type = val;
-        else if (key === 'mode') result.mode = val;
-        else if (key === 'pad_byte') result.pad_byte = val;
-        else if (key === 'partitions') inPartitions = true;
-        continue;
+    // 2. Apply selectors that drive the dynamic UI.
+    if (platform) {
+      const opt = Array.from($platform.options).find(o => o.value === platform);
+      if (opt) $platform.value = platform;
+    }
+    if (tab === 'quick') {
+      refreshFlashTypes();
+      if (flashType) {
+        const fopt = Array.from($flash.options).find(o => o.value === flashType);
+        if (fopt) $flash.value = flashType;
       }
-
-      if (line.match(/^partitions:\s*$/)) {
-        inPartitions = true;
-        continue;
+      if (osDist && $osDist) {
+        const dopt = Array.from($osDist.options).find(o => o.value === osDist);
+        if (dopt) $osDist.value = osDist;
       }
+      // Refresh dynamic options panel for current flash + os dist combo.
+      refreshAvailableOptions();
+    } else if (tab === 'custom' && flashType && $flashCustom) {
+      const fopt = Array.from($flashCustom.options).find(o => o.value === flashType);
+      if (fopt) $flashCustom.value = flashType;
+    }
 
-      if (inPartitions) {
-        const newEntry = line.match(/^\s+-\s+(\w+):\s*(.+)?$/);
-        if (newEntry) {
-          currentPartition = {};
-          const key = newEntry[1];
-          let val = (newEntry[2] || '').replace(/^["']|["']$/g, '').trim();
-          currentPartition[key] = val;
-          result.partitions.push(currentPartition);
-          continue;
-        }
-        const contMatch = line.match(/^\s+(\w+):\s*(.+)?$/);
-        if (contMatch && currentPartition) {
-          const key = contMatch[1];
-          let val = (contMatch[2] || '').replace(/^["']|["']$/g, '').trim();
-          currentPartition[key] = val;
-        }
+    loadFlashModels();
+    updateGptButtons();
+
+    // 3. Layout option checkboxes / radios — set silently, no events.
+    const opts = parsed.layout_options || {};
+    if (opts.nand_mode) {
+      const r = document.querySelector('input[name="nand_mode"][value="' + opts.nand_mode + '"]');
+      if (r) r.checked = true;
+    }
+    [['dual_kernel','opt-dual-kernel'], ['dual_rootfs','opt-dual-rootfs'],
+     ['dual_fip','opt-dual-fip'],       ['dual_firmware','opt-dual-firmware']].forEach(([key, id]) => {
+      if (opts[key] !== undefined) {
+        const cb = $(id);
+        if (cb) cb.checked = !!opts[key];
+      }
+    });
+
+    // 4. Flash info source + selection.
+    const fi = parsed.flash_info || {};
+    if (fi.source === 'custom') {
+      setFlashInfoMode('custom');
+      if (typeof fi.capacity === 'number') {
+        const opt = Array.from($customCapacity.options).find(o => parseInt(o.value, 10) === fi.capacity);
+        if (opt) $customCapacity.value = String(fi.capacity);
+      }
+      const setNum = (id, v) => {
+        const el = $(id);
+        if (el && typeof v === 'number') el.value = v;
+      };
+      setNum('custom-page-size',  fi.page_size);
+      setNum('custom-block-size', fi.block_size);
+      setNum('custom-oob-size',   fi.oob_size);
+      updateCustomFlashInfo();
+    } else if (fi.source === 'model') {
+      setFlashInfoMode('model');
+      if (fi.model) {
+        const m = flashModels.find(x => x.name === fi.model);
+        if (m) selectModel(m);
       }
     }
-    return result;
+
+    // 5. Layout — preserve reserved flags + sub_partitions so GPT stays
+    //    locked (handled by buildPartitionRow's `p.reserved === true`
+    //    branch).
+    if (Array.isArray(parsed.partitions) && parsed.partitions.length > 0) {
+      currentLayout = {
+        partitions: parsed.partitions.map(p => {
+          const part = {
+            name: p.name || 'unnamed',
+            start: p.start ?? '0x0',
+            size: p.size ?? '0x0',
+          };
+          if (p.reserved === true) part.reserved = true;
+          if (p.pad) part.pad = p.pad;
+          if (Array.isArray(p.sub_partitions) && p.sub_partitions.length > 0) {
+            part.sub_partitions = p.sub_partitions.map(s => {
+              const sub = { name: s.name || 'unnamed' };
+              if (s.start !== undefined) sub.start = s.start;
+              if (s.size  !== undefined) sub.size  = s.size;
+              if (s.kind) sub.kind = s.kind;
+              if (s.vol_id   !== undefined) sub.vol_id   = parseInt(s.vol_id, 10);
+              if (s.vol_type !== undefined) sub.vol_type = parseInt(s.vol_type, 10);
+              if (s.autoresize === true) sub.autoresize = true;
+              if (s.reserved   === true) sub.reserved   = true;
+              return sub;
+            });
+          }
+          return part;
+        }),
+        pad_byte: parsed.pad_byte || getDefaultPad(getActiveFlashType()),
+      };
+      partitionImageMap = {};
+    } else {
+      showToast('No partitions found in YAML.', 'error');
+    }
+
+    // 6. Image pool — record expected filenames as a notice. The actual
+    //    bytes aren't serialized in YAML; the user re-attaches via
+    //    drag-drop. We don't auto-create empty pool slots because they'd
+    //    confuse the pack flow (no .data).
+    const expected = Array.isArray(parsed.images) ? parsed.images : [];
+    renderPartitionTable();
+    renderLayoutVisualization();
+    if (expected.length > 0) {
+      const names = expected.map(x => x.filename).filter(Boolean).join(', ');
+      showToast(
+        'Layout loaded. Re-attach previously bound images: ' + names,
+        'success',
+        7000
+      );
+    } else {
+      showToast(
+        'YAML loaded: ' + (currentLayout?.partitions.length || 0) + ' partitions.',
+        'success'
+      );
+    }
+  }
+
+  // Indent-based YAML parser tailored to the schema this file emits.
+  // Supports nested mappings and lists of mappings; values are scalars
+  // (strings, ints, booleans, null). Block scalars, flow style, anchors,
+  // tags, multi-doc are not supported and not produced by the emitter.
+  function parseSimpleYaml(text) {
+    const lines = [];
+    for (const ln of text.split('\n')) {
+      const stripped = ln.replace(/\r$/, '');
+      if (/^\s*#/.test(stripped) || /^\s*$/.test(stripped)) continue;
+      const m = stripped.match(/^(\s*)(.*)$/);
+      lines.push({ indent: m[1].length, body: m[2] });
+    }
+    let i = 0;
+
+    function unquote(v) {
+      v = v.trim();
+      if (v.length >= 2 && ((v[0] === '"' && v[v.length-1] === '"') ||
+                            (v[0] === "'" && v[v.length-1] === "'"))) {
+        return v.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+      }
+      return v;
+    }
+    function parseScalar(raw) {
+      const t = (raw || '').trim();
+      if (t === '' || t === '~' || t === 'null') return null;
+      if (t === 'true')  return true;
+      if (t === 'false') return false;
+      if (t[0] === '"' || t[0] === "'") return unquote(t);
+      if (/^-?\d+$/.test(t)) {
+        const n = parseInt(t, 10);
+        if (Number.isSafeInteger(n)) return n;
+      }
+      if (/^-?\d+\.\d+$/.test(t)) return parseFloat(t);
+      return t; // bareword string (e.g. "openwrt-21.02", "0x4400")
+    }
+
+    function parseBlock(parentIndent) {
+      if (i >= lines.length) return null;
+      const first = lines[i];
+      if (first.indent <= parentIndent) return null;
+      const blockIndent = first.indent;
+      const isList = first.body.startsWith('-');
+
+      if (isList) {
+        const arr = [];
+        while (i < lines.length && lines[i].indent === blockIndent && lines[i].body.startsWith('-')) {
+          let body = lines[i].body.slice(1).replace(/^\s/, '');
+          // After "- ", we may have an inline "key: value" starting an
+          // item-mapping, a bare scalar, or nothing.
+          if (body === '') {
+            i++;
+            arr.push(parseBlock(blockIndent));
+            continue;
+          }
+          const kv = body.match(/^([\w][\w_]*)\s*:\s*(.*)$/);
+          if (kv) {
+            const obj = {};
+            const itemIndent = blockIndent + 2;
+            const k = kv[1];
+            const v = kv[2];
+            if (v === '') {
+              i++;
+              obj[k] = parseBlock(itemIndent);
+            } else {
+              obj[k] = parseScalar(v);
+              i++;
+            }
+            // Continue absorbing same-indent keys belonging to this item.
+            while (i < lines.length && lines[i].indent === itemIndent && !lines[i].body.startsWith('-')) {
+              const m2 = lines[i].body.match(/^([\w][\w_]*)\s*:\s*(.*)$/);
+              if (!m2) break;
+              const k2 = m2[1];
+              const v2 = m2[2];
+              if (v2 === '') {
+                i++;
+                obj[k2] = parseBlock(itemIndent);
+              } else {
+                obj[k2] = parseScalar(v2);
+                i++;
+              }
+            }
+            arr.push(obj);
+          } else {
+            arr.push(parseScalar(body));
+            i++;
+          }
+        }
+        return arr;
+      }
+
+      // Mapping
+      const obj = {};
+      while (i < lines.length && lines[i].indent === blockIndent && !lines[i].body.startsWith('-')) {
+        const m = lines[i].body.match(/^([\w][\w_]*)\s*:\s*(.*)$/);
+        if (!m) break;
+        const key = m[1];
+        const val = m[2];
+        if (val === '') {
+          i++;
+          obj[key] = parseBlock(blockIndent);
+        } else {
+          obj[key] = parseScalar(val);
+          i++;
+        }
+      }
+      return obj;
+    }
+
+    return parseBlock(-1) || {};
   }
 
   // ============================================================
