@@ -3549,10 +3549,27 @@ td.drag-over {
   // ── Per-partition inclusion checkboxes ────────────────────────────────────
   // Event delegation: any .part-include checkbox inside the tbody updates
   // partitionIncludeMap and syncs the "check all" master checkbox.
+  // When a top-level partition (key 'pN') is toggled, cascade the same
+  // value to every sub-partition (keys 'pN:0', 'pN:1', ...) — applies
+  // uniformly to UBI containers and raw multi-copy containers like BL2.
   $tbody.addEventListener('change', e => {
     const cb = e.target.closest('.part-include');
     if (!cb) return;
     partitionIncludeMap[cb.dataset.key] = cb.checked;
+
+    const m = cb.dataset.key && cb.dataset.key.match(/^p(\d+)$/);
+    if (m) {
+      const childPrefix = 'p' + m[1] + ':';
+      $tbody.querySelectorAll('.part-include').forEach(other => {
+        if (other === cb) return;
+        const k = other.dataset.key;
+        if (k && k.startsWith(childPrefix) && !other.disabled) {
+          other.checked = cb.checked;
+          partitionIncludeMap[k] = cb.checked;
+        }
+      });
+    }
+
     // Sync master: checked when all user-toggleable boxes are checked.
     const allCbs = $tbody.querySelectorAll('.part-include:not(:disabled)');
     const allChecked = Array.from(allCbs).every(c => c.checked);
