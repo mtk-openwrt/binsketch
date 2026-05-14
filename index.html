@@ -2709,18 +2709,19 @@ td.drag-over {
     $tbody.innerHTML = '';
     // Default-include any partition keys that haven't been seen before.
     // Existing user choices are preserved across re-renders.
-    // Special case: rootfs_data UBI volume defaults to UNCHECKED (no
-    // overlay image to pack) — same logic as eMMC/SD u-boot-env etc.
-    // The vtbl entry is still emitted because the layout always carries
-    // rootfs_data as a sub-partition; only the "include in image" flag
-    // is off by default.
+    // Every partition / sub-partition defaults to CHECKED, including
+    // rootfs_data — it carries no overlay image but its vtbl entry is
+    // what makes UBI grow it on first boot, so the natural OpenWrt
+    // workflow needs it on. Users opting out of /overlay just uncheck
+    // rootfs_data (or the whole ubi container) and the pack pruner
+    // drops the volume / vtbl entry / autoresize flag together.
     parts.forEach((p, idx) => {
       const key = 'p' + idx;
       if (!(key in partitionIncludeMap)) partitionIncludeMap[key] = true;
       (p.sub_partitions || []).forEach((sub, subIdx) => {
         const subKey = 'p' + idx + ':' + subIdx;
         if (!(subKey in partitionIncludeMap)) {
-          partitionIncludeMap[subKey] = sub.name !== 'rootfs_data';
+          partitionIncludeMap[subKey] = true;
         }
       });
     });
@@ -3570,6 +3571,21 @@ td.drag-over {
       });
     }
 
+    // If the include checkbox for the volume that's currently marked
+    // autoresize was just unchecked (either directly or via the parent
+    // cascade), drop the autoresize tag too — the volume is about to
+    // be pruned from the vtbl, so the autoresize flag would land on a
+    // ghost. Mirror it onto the corresponding .vol-autoresize checkbox
+    // so the UI stays consistent.
+    if (autoresizeVolumeKey) {
+      const arInc = $tbody.querySelector('.part-include[data-key="' + autoresizeVolumeKey + '"]');
+      if (arInc && !arInc.checked) {
+        autoresizeVolumeKey = null;
+        const arBox = $tbody.querySelector('.vol-autoresize[data-key="' + arInc.dataset.key + '"]');
+        if (arBox) arBox.checked = false;
+      }
+    }
+
     // Sync master: checked when all user-toggleable boxes are checked.
     const allCbs = $tbody.querySelectorAll('.part-include:not(:disabled)');
     const allChecked = Array.from(allCbs).every(c => c.checked);
@@ -3753,13 +3769,55 @@ td.drag-over {
       }
     }
 
-    // layout_json: the exact post-edit partition table. Covers every
-    // structural change the user made in the table (delete / rename /
-    // reorder / add) in one payload, so the Rust core skips the
-    // options-driven builder and trusts the shipped layout.
-    const layoutJson = (currentLayout && Array.isArray(currentLayout.partitions))
-      ? JSON.stringify(currentLayout)
-      : null;
+    // layout_json: the exact post-edit partition table the Rust core
+    // will pack. Two transforms over currentLayout:
+    //
+    //   1. Prune unchecked entries.  A top-level partition with
+    //      partitionIncludeMap[key] === false is dropped entirely
+    //      (along with all its sub-partitions). A sub-partition with
+    //      its own key === false is dropped too — no exceptions, so
+    //      the vtbl shrinks to exactly what the user wanted to ship.
+    //      If a user unchecks rootfs_data, its vtbl entry and
+    //      autoresize flag both go: opting out of /overlay is
+    //      explicit and consistent with the include checkbox.
+    //
+    //      Without pruning, packing "BL2 only" still emits a UBI image
+    //      (2 PEBs vtbl + 5 PEBs EOF ≈ 0.87 MiB at 128 KiB blocks) on
+    //      top of the BL2 region, producing a 2.87 MiB file instead
+    //      of the expected 2 MiB. Pruning removes the ubi container
+    //      entirely, which drives `pack_with_ubi` → `pack_legacy` in
+    //      the Rust core.
+    //
+    //   2. Bake the user's autoresize choice (autoresizeVolumeKey)
+    //      onto each volume's sub.autoresize field. The Rust core
+    //      ignores PackInput.partition_autoresize when layout_override
+    //      is set, so the override has to win at this layer instead.
+    let layoutJson = null;
+    if (currentLayout && Array.isArray(currentLayout.partitions)) {
+      const pruned = { ...currentLayout, partitions: [] };
+      currentLayout.partitions.forEach((p, idx) => {
+        const partKey = 'p' + idx;
+        if (partitionIncludeMap[partKey] === false) return;
+        const newP = { ...p };
+        if (Array.isArray(p.sub_partitions)) {
+          const keptSubs = [];
+          p.sub_partitions.forEach((sub, si) => {
+            const subKey = partKey + ':' + si;
+            if (partitionIncludeMap[subKey] === false) return;
+            const baked = { ...sub };
+            if (sub.kind === 'ubi-volume') {
+              // Override the layout's autoresize flag with the user's
+              // checkbox state (single source of truth on the UI side).
+              baked.autoresize = (autoresizeVolumeKey === subKey);
+            }
+            keptSubs.push(baked);
+          });
+          newP.sub_partitions = keptSubs;
+        }
+        pruned.partitions.push(newP);
+      });
+      layoutJson = JSON.stringify(pruned);
+    }
 
     showToast('Packing image...', '');
     try {
